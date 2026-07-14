@@ -1,0 +1,6 @@
+{
+  "name": "intervals",
+  "description": "Greenfield (easy-medium): half-open interval set with merge/split/query, edge-case heavy",
+  "timeout_s": 900,
+  "expects": ["intervals.py"]
+}

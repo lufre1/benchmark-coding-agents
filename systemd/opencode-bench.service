@@ -1,0 +1,12 @@
+[Unit]
+Description=opencode model/agent benchmark campaign (matrix x3 repeats)
+# The campaign gates itself on the SAIA budget and can run for many hours;
+# campaign.sh's flock makes accidental overlap harmless.
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/testbench
+ExecStart=%h/testbench/campaign.sh
+# Campaigns legitimately run for hours; never let systemd kill a run mid-flight.
+TimeoutStartSec=infinity
+Nice=10

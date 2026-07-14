@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily opencode benchmark campaign at 06:00
+
+[Timer]
+OnCalendar=*-*-* 06:00
+# Fire on next boot/login if the server was down at 06:00.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

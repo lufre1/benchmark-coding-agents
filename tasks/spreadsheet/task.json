@@ -1,0 +1,6 @@
+{
+  "name": "spreadsheet",
+  "description": "Greenfield (hard): spreadsheet engine with formula parser, ranges, dependency graph, cycle detection",
+  "timeout_s": 1200,
+  "expects": ["spreadsheet.py"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "csv-bugfix",
+  "description": "Debugging (medium): fix 4 planted bugs in a CSV statistics module from user bug reports",
+  "timeout_s": 900,
+  "expects": ["csvstats.py"]
+}
