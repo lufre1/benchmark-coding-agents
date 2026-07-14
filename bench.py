@@ -630,13 +630,15 @@ def load_results():
         except ValueError:
             log(f"WARNING: unreadable {result_file}")
             continue
-        # Retro-classify runs recorded before provider-error detection existed.
+        # Retro-classify runs recorded before provider/budget-error detection.
         for phase in result.get("phases", []):
-            marker = f"provider_error_p{phase['phase']}"
-            if (marker not in result["flags"]
-                    and any(PROVIDER_ERROR_RE.search(e) for e in phase.get("errors", []))):
-                result["flags"].append(marker)
-                result["invalid"] = True
+            for regex, kind in ((PROVIDER_ERROR_RE, "provider_error"),
+                                (BUDGET_ERROR_RE, "budget_exhausted")):
+                marker = f"{kind}_p{phase['phase']}"
+                if (marker not in result["flags"]
+                        and any(regex.search(e) for e in phase.get("errors", []))):
+                    result["flags"].append(marker)
+                    result["invalid"] = True
         results.append(result)
     return results
 
