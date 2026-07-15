@@ -96,6 +96,20 @@
         "plan": "saia-gwdg/qwen3-coder-next",
         "build": "saia-gwdg/qwen3-coder-next"
       }
+    },
+    "planbuild-ds4-coder": {
+      "description": "plan via deepseek-v4-flash, build via qwen3-coder-next (cross-model handoff)",
+      "phases": [
+        {"agent": "plan"},
+        {
+          "agent": "build",
+          "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."
+        }
+      ],
+      "models": {
+        "plan": "saia-gwdg/deepseek-v4-flash",
+        "build": "saia-gwdg/qwen3-coder-next"
+      }
     }
   }
 }

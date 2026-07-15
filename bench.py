@@ -149,6 +149,8 @@ def budget_gate(floor, wait):
     keys) is above `floor`. Returns the full budget snapshot (or None if
     the budget file is unreadable). Entirely stale data counts as
     replenished."""
+    max_wait = 90 * 60  # 90 minutes — abort if the budget hasn't reset by then
+    waited = 0
     while True:
         snap = read_budget()
         if snap is None:
@@ -162,8 +164,13 @@ def budget_gate(floor, wait):
         if not wait:
             sys.exit(f"ABORT: hourly SAIA budget too low (~{view['hour']} < floor {floor}); "
                      "rerun without --no-wait to wait")
+        waited += 120
+        eta = max(0, max_wait - waited)
         log(f"hourly budget ~{view['hour']} across {view['key_count']} key(s) "
-            f"< floor {floor}, waiting 2 min ...")
+            f"< floor {floor}, waited {waited//60}m, will wait up to {eta//60}m more")
+        if waited >= max_wait:
+            sys.exit(f"ABORT: waited {waited//60}m for SAIA hourly budget to reset "
+                     f"(still ~{view['hour']} < floor {floor}), giving up")
         time.sleep(120)
 
 
@@ -605,19 +612,38 @@ def cmd_run(args):
             f"(per-run budget deltas disabled; request counts come from the DB)")
         with ThreadPoolExecutor(max_workers=parallel) as pool:
             list(pool.map(execute, plan))
-    # One retry round for runs invalidated by provider trouble (stalls, 5xx).
+    # Retry loop for runs invalidated by provider trouble (stalls, 5xx).
+    # Uses exponential backoff (10min → 30min → 60min) with up to 3
+    # attempts, so transient SAIA outages don't permanently crater a run.
     retries = [(t, n, c, rep) for t, n, c, rep, res in outcomes
                if res and res.get("invalid")]
     if retries and not args.dry_run and not args.no_retry:
-        log(f"retrying {len(retries)} invalid run(s) once ...")
-        for task, name, combo, rep in retries:
-            try:
-                cooldown_if_provider_trouble(
-                    do_run(task, name, combo, defaults, rep, args))
-            except KeyboardInterrupt:
-                raise
-            except Exception as exc:
-                log(f"ERROR in retry {task['name']}/{name}: {exc!r} — continuing")
+        max_retries = 3
+        backoff = [600, 1800, 3600]  # 10min, 30min, 60min
+        for attempt in range(1, max_retries + 1):
+            still_invalid = []
+            for task, name, combo, rep in retries:
+                try:
+                    res = do_run(task, name, combo, defaults, rep, args)
+                    if res and res.get("invalid"):
+                        still_invalid.append((task, name, combo, rep))
+                except KeyboardInterrupt:
+                    raise
+                except Exception as exc:
+                    log(f"ERROR in retry {task['name']}/{name}: {exc!r} — continuing")
+                    still_invalid.append((task, name, combo, rep))
+            retries = still_invalid
+            if not retries:
+                break
+            if attempt < max_retries:
+                cooldown = backoff[attempt - 1]
+                log(f"{len(retries)} run(s) still invalid after retry {attempt} — "
+                    f"cooling down {cooldown}s before retry {attempt + 1}")
+                time.sleep(cooldown)
+        if retries:
+            labels = [f'{t["name"]}/{n}_r{rep}' for t, n, _, rep in retries]
+            log(f"GIVING UP on {len(retries)} run(s) after {max_retries} retries: "
+                f"{' | '.join(labels)}")
     if not args.dry_run:
         cmd_report(args)
 
