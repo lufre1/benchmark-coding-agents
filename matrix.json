@@ -110,6 +110,113 @@
         "plan": "saia-gwdg/deepseek-v4-flash",
         "build": "saia-gwdg/qwen3-coder-next"
       }
+    "planbuild-p_qwen35-b_qwen36": {
+      "description": "plan=qwen3.5-122b-a10b -> build=qwen3.6-35b-a3b",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3.5-122b-a10b", "build": "saia-gwdg/qwen3.6-35b-a3b"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_qwen35-b_coder": {
+      "description": "plan=qwen3.5-122b-a10b -> build=qwen3-coder-next",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3.5-122b-a10b", "build": "saia-gwdg/qwen3-coder-next"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_qwen35-b_dsv4": {
+      "description": "plan=qwen3.5-122b-a10b -> build=deepseek-v4-flash",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3.5-122b-a10b", "build": "saia-gwdg/deepseek-v4-flash"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_qwen35-b_glm47": {
+      "description": "plan=qwen3.5-122b-a10b -> build=glm-4.7",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3.5-122b-a10b", "build": "saia-gwdg/glm-4.7"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_mistral-b_qwen36": {
+      "description": "plan=mistral-medium-3.5-128b -> build=qwen3.6-35b-a3b",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/mistral-medium-3.5-128b", "build": "saia-gwdg/qwen3.6-35b-a3b"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_mistral-b_coder": {
+      "description": "plan=mistral-medium-3.5-128b -> build=qwen3-coder-next",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/mistral-medium-3.5-128b", "build": "saia-gwdg/qwen3-coder-next"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_mistral-b_dsv4": {
+      "description": "plan=mistral-medium-3.5-128b -> build=deepseek-v4-flash",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/mistral-medium-3.5-128b", "build": "saia-gwdg/deepseek-v4-flash"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_mistral-b_glm47": {
+      "description": "plan=mistral-medium-3.5-128b -> build=glm-4.7",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/mistral-medium-3.5-128b", "build": "saia-gwdg/glm-4.7"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_coder-b_qwen36": {
+      "description": "plan=qwen3-coder-next -> build=qwen3.6-35b-a3b",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3-coder-next", "build": "saia-gwdg/qwen3.6-35b-a3b"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_coder-b_coder": {
+      "description": "plan=qwen3-coder-next -> build=qwen3-coder-next",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3-coder-next", "build": "saia-gwdg/qwen3-coder-next"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_coder-b_dsv4": {
+      "description": "plan=qwen3-coder-next -> build=deepseek-v4-flash",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3-coder-next", "build": "saia-gwdg/deepseek-v4-flash"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
+    },
+    "planbuild-p_coder-b_glm47": {
+      "description": "plan=qwen3-coder-next -> build=glm-4.7",
+      "phases": [
+        {"agent": "plan"},
+        {"agent": "build", "prompt": "Now implement the plan you just created. Work in the current working directory and produce all deliverable files exactly as the original task requires, including tests and NOTES.md."}
+      ],
+      "models": {"plan": "saia-gwdg/qwen3-coder-next", "build": "saia-gwdg/glm-4.7"},
+      "agent_config": {"plan": {"permission": {"edit": "deny", "write": "deny", "bash": "deny", "task": {"*": "deny"}}}}
     }
   }
 }
