@@ -110,6 +110,7 @@
         "plan": "saia-gwdg/deepseek-v4-flash",
         "build": "saia-gwdg/qwen3-coder-next"
       }
+    },
     "planbuild-p_qwen35-b_qwen36": {
       "description": "plan=qwen3.5-122b-a10b -> build=qwen3.6-35b-a3b",
       "phases": [
