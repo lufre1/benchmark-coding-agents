@@ -1,0 +1,6 @@
+{
+  "name": "minilang",
+  "description": "Greenfield (very hard): tree-walking interpreter for a small imperative language — lexer, recursive-descent parser, closures, block scoping, precise error taxonomy",
+  "timeout_s": 1800,
+  "expects": ["interp.py"]
+}

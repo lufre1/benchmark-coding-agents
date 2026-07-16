@@ -89,8 +89,9 @@ Invalid runs get one automatic retry (unless `--no-retry`).
 |---|---|---|---|
 | `csv-bugfix` | Debugging (medium) | `csvstats.py` | Fix 4 planted bugs from user bug reports |
 | `intervals` | Greenfield (easy-medium) | `intervals.py` | Half-open interval set (merge/split/query) |
-| `ratelimit` | — | — | — |
-| `spreadsheet` | — | — | — |
+| `ratelimit` | Greenfield (medium) | `ratelimit.py` | Token-bucket rate limiter with injectable clock, per-key state |
+| `spreadsheet` | Greenfield (hard) | `spreadsheet.py` | Formula parser, ranges, dependency graph, cycle detection |
+| `minilang` | Greenfield (very hard) | `interp.py` | Tree-walking interpreter: lexer, recursive-descent parser, closures, scoping, error taxonomy |
 
 ## Security note
 
