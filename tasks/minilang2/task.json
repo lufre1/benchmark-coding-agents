@@ -1,0 +1,6 @@
+{
+  "name": "minilang2",
+  "description": "Greenfield (expert): extended minilang interpreter — containers with reference semantics, for loops with per-iteration binding, try/catch/finally, error positions, performance constraints",
+  "timeout_s": 1800,
+  "expects": ["interp.py"]
+}

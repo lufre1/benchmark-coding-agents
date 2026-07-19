@@ -60,6 +60,11 @@ exploited by `--parallel N`.
 
 All combos use `auto_approve: true` (headless, no confirmation prompts).
 
+**Global YAGNI instruction:** since 2026-07-16, `~/.config/opencode/opencode.jsonc`
+appends `~/.config/opencode/yagni.md` (a YAGNI-first principle) to the system
+prompt of *every* agent via the top-level `instructions` field. Runs from that
+date onward are not comparable with earlier ones.
+
 ## Adding a task
 
 Create `tasks/<name>/` with:
