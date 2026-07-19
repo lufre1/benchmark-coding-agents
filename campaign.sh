@@ -18,13 +18,22 @@ if ! flock -n 9; then
     exit 0
 fi
 
+# Protect this process from OOM killer — lower oom_score_adj so the kernel
+# prefers to kill other processes (like LLM subprocesses) before the bench.
+if [ -w /proc/self/oom_score_adj ]; then
+    echo -500 > /proc/self/oom_score_adj
+fi
+
 {
     echo "$(date -Is) campaign start (args: --repeats 3 ${CAMPAIGN_ARGS:-} $*)"
+    free -h | tee -a campaign.log
     # shellcheck disable=SC2086
     python3 bench.py run --repeats 3 ${CAMPAIGN_ARGS:-} "$@"
+    rc=$?
     if [[ "$*" != *--dry-run* ]]; then
         python3 bench.py report
     fi
-    echo "$(date -Is) campaign complete"
+    echo "$(date -Is) campaign complete (exit code $rc)"
+    free -h | tee -a campaign.log
 } 2>&1 | tee -a campaign.log
-exit "${PIPESTATUS[0]}"
+exit "${rc}"

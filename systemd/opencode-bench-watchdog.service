@@ -1,0 +1,12 @@
+[Unit]
+Description=opencode bench watchdog — restart aborted campaigns
+Wants=opencode-bench-watchdog.timer
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/benchmark-coding-agents
+ExecStart=%h/benchmark-coding-agents/systemd/campaign-watchdog.sh
+TimeoutStartSec=30
+
+[Install]
+WantedBy=timers.target

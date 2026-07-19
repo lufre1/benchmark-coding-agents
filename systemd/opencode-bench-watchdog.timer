@@ -1,0 +1,10 @@
+[Unit]
+Description=Run opencode bench watchdog every 15 minutes
+Requires=opencode-bench-watchdog.service
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

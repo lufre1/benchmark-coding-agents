@@ -5,8 +5,8 @@ Description=opencode model/agent benchmark campaign (matrix x3 repeats)
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/testbench
-ExecStart=%h/testbench/campaign.sh
+WorkingDirectory=%h/benchmark-coding-agents
+ExecStart=%h/benchmark-coding-agents/campaign.sh
 # Campaigns legitimately run for hours; never let systemd kill a run mid-flight.
 TimeoutStartSec=infinity
 Nice=10
