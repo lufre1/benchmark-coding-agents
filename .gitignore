@@ -1,7 +1,8 @@
 runs/
-results.csv
-report.md
+#results.csv
+#report.md
 __pycache__/
 *.log
 *.lock
 .~lock.*#
+.watch*
