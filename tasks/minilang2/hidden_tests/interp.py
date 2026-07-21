@@ -1,9 +1,16 @@
-"""MiniLang2 interpreter - tree walking with tokenizer, recursive descent parser, evaluator."""
+"""MiniLang2 tree-walking interpreter.
+
+Tokeniser -> recursive-descent parser -> evaluator.
+Supports: integers, bools, strings, nil, arrays, dicts, functions/closures,
+closures, reference semantics, for/for-in loops with per-iteration bindings,
+try/catch/finally/throw, precise error taxonomy with source positions.
+"""
 
 import sys
 
-sys.setrecursionlimit(20000)
-
+# ---------------------------------------------------------------------------
+# Errors (public API)
+# ---------------------------------------------------------------------------
 
 class LangError(Exception):
     def __init__(self, msg="", line=None, col=None):
@@ -54,14 +61,19 @@ def _stamp(exc, pos):
     return exc
 
 
+# ---------------------------------------------------------------------------
+# Tokenizer
+# ---------------------------------------------------------------------------
+
 KEYWORDS = {
     "let", "fn", "return", "if", "else", "while", "for", "in",
     "break", "continue", "true", "false", "nil",
     "try", "catch", "finally", "throw",
 }
 
-TWO_CHAR_OPS = {"==", "!=", "<=", ">=", "&&", "||", "**", "+=", "-=", "*=", "/=", "%="}
-ONE_CHAR_OPS = set("+-*/%<>=!(){}[],;:?")
+_TWO_CHAR_OPS = {"==", "!=", "<=", ">=", "&&", "||", "**",
+                 "+=", "-=", "*=", "/=", "%="}
+_ONE_CHAR_OPS = set("+-*/%<>=!(){}[],;:?")
 
 ESCAPES = {"\\": "\\", '"': '"', "n": "\n", "t": "\t"}
 
@@ -126,20 +138,25 @@ def tokenize(source):
             parts = []
             while True:
                 if i >= n:
-                    raise LangSyntaxError("unterminated string literal", tok_line, tok_col)
+                    raise LangSyntaxError("unterminated string literal",
+                                          tok_line, tok_col)
                 ch = source[i]
                 if ch == '"':
                     adv()
                     break
                 if ch == "\n":
-                    raise LangSyntaxError("newline in string literal", tok_line, tok_col)
+                    raise LangSyntaxError("newline in string literal",
+                                          tok_line, tok_col)
                 if ch == "\\":
                     esc_line, esc_col = line, col
                     if i + 1 >= n:
-                        raise LangSyntaxError("unterminated string literal", tok_line, tok_col)
+                        raise LangSyntaxError("unterminated string literal",
+                                              tok_line, tok_col)
                     esc = ESCAPES.get(source[i + 1])
                     if esc is None:
-                        raise LangSyntaxError("invalid escape \\%s" % source[i + 1], esc_line, esc_col)
+                        raise LangSyntaxError(
+                            "invalid escape \\%s" % source[i + 1],
+                            esc_line, esc_col)
                     parts.append(esc)
                     adv(2)
                     continue
@@ -148,11 +165,11 @@ def tokenize(source):
             tokens.append(("string", "".join(parts), tok_line, tok_col))
             continue
         two = source[i:i + 2]
-        if two in TWO_CHAR_OPS:
+        if two in _TWO_CHAR_OPS:
             tokens.append(("op", two, tok_line, tok_col))
             adv(2)
             continue
-        if c in ONE_CHAR_OPS:
+        if c in _ONE_CHAR_OPS:
             tokens.append(("op", c, tok_line, tok_col))
             adv()
             continue
@@ -160,6 +177,40 @@ def tokenize(source):
     tokens.append(("eof", None, line, col))
     return tokens
 
+
+# ---------------------------------------------------------------------------
+# Parser
+#
+# AST nodes are tuples tagged by their first element. pos = (line, col) of
+# the node's error-anchor token.
+# Statements:
+#   ("let", name, expr, pos)              pos = identifier
+#   ("assign", target, op|None, expr, pos)  op in "+-*/%" for compound;
+#                                            pos = assignment operator
+#   ("fn", name, params, body_stmts, pos) pos = identifier
+#   ("if", cond, then, else|None, pos)
+#   ("while", cond, body, pos)
+#   ("for", name, init, cond, step_assign, body_stmts, pos)
+#   ("forin", name, iter_expr, body_stmts, pos)
+#   ("try", try_stmts, catch_name|None, catch_stmts|None,
+#           finally_stmts|None, pos)
+#   ("throw", expr, pos)
+#   ("return", expr|None)
+#   ("break",)
+#   ("continue",)
+#   ("block", stmts)
+#   ("expr", expr)
+# Expressions:
+#   ("lit", v) ("var", name, pos) ("group", expr)
+#   ("bin", op, l, r, pos)              pos = operator token
+#   ("and", l, r, pos) ("or", l, r, pos)
+#   ("un", op, e, pos)
+#   ("ternary", cond, a, b, pos)        pos = "?"
+#   ("call", callee, args, pos)         pos = "("
+#   ("index", obj, idx, pos)            pos = "["
+#   ("slice", obj, lo|None, hi|None, pos) pos = "["
+#   ("array", elems) ("dict", [(key, expr), ...])
+# ---------------------------------------------------------------------------
 
 ASSIGN_OPS = {"=", "+=", "-=", "*=", "/=", "%="}
 
@@ -203,7 +254,8 @@ class Parser:
     def expect_ident(self):
         kind, value, ln, cl = self.advance()
         if kind != "ident":
-            raise LangSyntaxError("expected identifier, got %r" % (value,), ln, cl)
+            raise LangSyntaxError("expected identifier, got %r" % (value,),
+                                  ln, cl)
         return value, (ln, cl)
 
     def at_kw(self, kw):
@@ -215,6 +267,8 @@ class Parser:
         while self.peek()[0] != "eof":
             stmts.append(self.statement())
         return stmts
+
+    # -- statements ---------------------------------------------------------
 
     def statement(self):
         kind, value, ln, cl = self.peek()
@@ -289,7 +343,8 @@ class Parser:
             while True:
                 param, ppos = self.expect_ident()
                 if param in params:
-                    raise LangSyntaxError("duplicate parameter %r" % param, *ppos)
+                    raise LangSyntaxError("duplicate parameter %r" % param,
+                                          *ppos)
                 params.append(param)
                 if self.match_op(")"):
                     break
@@ -423,6 +478,8 @@ class Parser:
                 raise LangSyntaxError("unterminated block", eln, ecl)
             stmts.append(self.statement())
         return ("block", stmts)
+
+    # -- expressions --------------------------------------------------------
 
     def expression(self):
         return self.ternary()
@@ -579,9 +636,11 @@ class Parser:
                 while True:
                     kkind, kvalue, kln, kcl = self.advance()
                     if kkind != "string":
-                        raise LangSyntaxError("dict key must be a string literal", kln, kcl)
+                        raise LangSyntaxError(
+                            "dict key must be a string literal", kln, kcl)
                     if kvalue in seen:
-                        raise LangSyntaxError("duplicate dict key %r" % kvalue, kln, kcl)
+                        raise LangSyntaxError(
+                            "duplicate dict key %r" % kvalue, kln, kcl)
                     seen.add(kvalue)
                     self.expect_op(":")
                     entries.append((kvalue, self.expression()))
@@ -591,6 +650,10 @@ class Parser:
             return ("dict", entries)
         raise LangSyntaxError("unexpected token %r" % (value,), ln, cl)
 
+
+# ---------------------------------------------------------------------------
+# Runtime
+# ---------------------------------------------------------------------------
 
 class Env:
     __slots__ = ("vars", "parent")
@@ -950,11 +1013,10 @@ def _eval(node, env):
             raise _stamp(e, node[4])
     if tag == "array":
         return [_eval(e, env) for e in node[1]]
-    if tag == "dict":
-        result = {}
-        for key, expr in node[1]:
-            result[key] = _eval(expr, env)
-        return result
+    result = {}
+    for key, expr in node[1]:
+        result[key] = _eval(expr, env)
+    return result
 
 
 def _exec_assign(node, env):
@@ -1144,6 +1206,10 @@ def _exec(node, env):
     else:
         raise _Continue()
 
+
+# ---------------------------------------------------------------------------
+# Entry point (public API)
+# ---------------------------------------------------------------------------
 
 def run(source):
     sys.setrecursionlimit(max(sys.getrecursionlimit(), 20000))

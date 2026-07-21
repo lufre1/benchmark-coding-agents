@@ -159,3 +159,6 @@ run_id,task,combo,passed,tests_total,pass_rate,wall_s,requests,budget_spent,tool
 20260719T185111Z_minilang2_planbuild-p_coder-b_glm47_r1,minilang2,planbuild-p_coder-b_glm47,0,200,0.0,635.5,22,21,31,1724514,8169,0,1732683,0.0,False,
 20260719T190149Z_minilang2_planbuild-p_coder-b_glm47_r1,minilang2,planbuild-p_coder-b_glm47,200,200,1.0,659.1,17,16,19,976346,15039,0,991385,0.0,True,stalled_p2
 20260720T160719Z_minilang2_solo-coder_r1,minilang2,solo-coder,200,200,1.0,558.1,125,131,94,5387228,40809,0,6902124,0.0,False,
+20260721T065548Z_minilang2_planbuild-ds4-coder_r1,minilang2,planbuild-ds4-coder,200,200,1.0,292.1,27,28,35,1780545,31825,0,1812370,0.0,False,
+20260721T070044Z_minilang2_planbuild-ds4-coder_r2,minilang2,planbuild-ds4-coder,200,200,1.0,113.2,21,22,26,1659402,6065,0,1665467,0.0,False,
+20260721T070240Z_minilang2_planbuild-ds4-coder_r3,minilang2,planbuild-ds4-coder,200,200,1.0,59.4,16,17,23,1012409,2411,0,1014820,0.0,False,

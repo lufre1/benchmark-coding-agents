@@ -1,134 +1,118 @@
-# MiniLang2 Interpreter — Design and Implementation Notes
+# MiniLang2 Interpreter — Design Notes
 
 ## Architecture
 
-The interpreter is a classic tree-walking design with three phases:
+The interpreter is a classic three-stage pipeline:
 
-1. **Tokenizer** (`tokenize`): Linear scan producing a list of `(kind, value, line, col)` tuples. Uses maximal munch (two-char ops checked before single-char). Tracks 1-based line/col for every token.
+1. **Tokenizer** (`tokenize`) — reads source text, emits a flat list of tokens.
+2. **Parser** (`Parser`) — recursive-descent, one-token lookahead, produces an AST.
+3. **Evaluator** (`_eval`/`_exec`) — tree-walking, operates on plain Python objects.
 
-2. **Recursive-descent parser** (`Parser`): Produces an AST as nested tuples tagged by the first element. Each node carries a `pos` tuple `(line, col)` representing the error-anchor token for that sub-expression/statement. Operator precedence is encoded in the parsing methods (lowest to highest: ternary, `||`, `&&`, `==`/`!=`, `<`/`<=`/`>`/`>=`, `+`/`-`, `*`/`/`/`%`, unary, `**`, postfix).
+## Tokenizer
 
-3. **Evaluator** (`_eval`/`_exec`): Walks the AST, using an `Env` chain for scoping. Internal control flow (`_Return`, `_Break`, `_Continue`) is implemented as Python exceptions to naturally unwind through the call stack and `try`/`finally` blocks.
+- Maximal munch: two-character operators (`<=`, `**`, `+=`, etc.) are matched before single-character ones.
+- String literals are scanned inline with a table of valid escapes (`\\`, `\"`, `\n`, `\t`); any other escape, unterminated string, or raw newline → `LangSyntaxError`.
+- Comments (`//` to end of line) are skipped during tokenization; `//` inside a string literal is not a comment.
+- Source positions (line, col) are tracked as 1-based integers during scanning.
 
-## Key Design Decisions
+## Parser
 
-### Error Position Tracking
+Recursive-descent parser following the grammar exactly. Key design decisions:
 
-Every `LangError` subclass constructor accepts `line` and `col` (1-based). The `_stamp(exc, pos)` helper fills in a missing position — deeper (more specific) error anchors take precedence over higher-level ones. This allows the evaluator to raise type errors at the operator position while the parser can raise syntax errors at the specific offending token.
+- **Statement/expression split**: Assignment (`=`, `+=`, etc.) is a statement-level construct, never parsed inside an expression. The `expr_or_assign_stmt` method parses an expression, then checks if the next token is an assignment operator.
+- **Assignment target validation**: After parsing the target expression, `_validate_target` checks it is a `var` or `index` node. Function calls, slices, parenthesized expressions, and literals are rejected.
+- **Right-associativity**: `**` parses its right operand with `unary` (which includes `power` in its chain); `?:` parses the middle and right operands with recursive calls to `ternary`.
+- **Braces in statement vs expression position**: `{` in statement position calls `self.block()`, which expects `}` only after parsing statements. In expression position (via `primary`), `{` starts a dict literal. The distinction emerges naturally from the grammar: `primary` is only reached from expression parsing.
+- **`break`/`continue` guards**: The parser tracks `loop_depth` (incremented for `while`, `for`, `forin`, reset to 0 inside `fn` bodies) to detect `break`/`continue` outside a loop within the same function at parse time.
+- **`return` guard**: `fn_depth` is tracked; `return` outside a function is a parse error.
+- **Duplicate detection**: Duplicate parameter names and duplicate dict literal keys are detected during parsing and raise `LangSyntaxError`.
 
-### Source Position Anchors
+## Evaluator
 
-Graded anchors per the spec:
+### Values
 
-| Error | Anchor |
-|---|---|
-| Syntax: unexpected char | that character position |
-| Syntax: unterminated string | opening `"` position |
-| Syntax: invalid escape | the backslash position |
-| Syntax: keyword as identifier | the keyword token position |
-| Syntax: missing `;` | the token found where `;` expected |
-| Runtime: binary op type/zerodiv | the operator token |
-| Runtime: arity/call-non-function | the `(` of the call |
-| Runtime: index/key error | the `[` of the index |
-| Runtime: undefined variable | the identifier token |
+All MiniLang2 values are plain Python objects:
+- `int` ← Python `int` (but `bool` is checked with `isinstance(v, bool)` to distinguish from int)
+- `bool` ← Python `bool`
+- `string` ← Python `str`
+- `nil` ← `None`
+- `function` ← `Function` (closure: params + body AST + environment)
+- `builtin function` ← `Builtin` (name + Python callable + arity)
+- `array` ← Python `list`
+- `dict` ← Python `dict` (which preserves insertion order since Python 3.7)
+- `error` ← `ErrorValue` (kind string + original exception)
 
-### For-loop Per-iteration Bindings
+Type identity tests use `_type_name()` which explicitly checks `bool` before `int`.
 
-The C-style `for` creates a fresh scope `env_i` for the loop variable. On each iteration:
-1. Body executes in a child scope of `env_i` (capturing `env_i` for closures).
-2. After the body (or `continue`), a new `env = Env(outer)` is created with just the loop variable's current value copied in.
-3. The step assignment runs in this new env.
-4. `env_i` is replaced with the new env for the next iteration.
+### Environment chain
 
-This ensures closures created in iteration `i` close over that iteration's binding, not a shared one.
+`Env` objects form a linked list (`parent` pointer). Each scope instance is a separate `Env` with its own `vars` dict:
 
-The `for-in` variant creates a fresh per-iteration `ienv` with the element bound as the loop variable, also ensuring per-iteration capture.
+- `get(name)` walks the chain upward
+- `assign(name, value)` walks the chain upward looking for an existing binding
+- `declare(name, value)` adds to the current scope (raises `LangNameError` if already present)
+
+Builtins live in an `Env` at the bottom of the chain (outermost scope), so top-level `let print = 5;` shadows without redeclaration error.
+
+### Control flow signals
+
+Python exceptions are used for internal control flow:
+
+- `_Return(value)` — function return
+- `_Break()` — break from loop
+- `_Continue()` — continue loop
+- `_Thrown(value, pos)` — uncaught user throw
+
+These are `BaseException` subclasses (via inheriting from `Exception`) that are never caught by `try`/`catch` in the language — only by the loop machinery, function call machinery, and the `finally` handler.
+
+### For loops — per-iteration binding
+
+C-style `for (let i = INIT; COND; STEP) BODY`:
+
+1. A fresh `Env` `E` is created with `i` declared to the evaluated INIT.
+2. Each iteration: COND is evaluated in `E`; BODY runs in a child scope of `E`; a new `Env` `E'` is created (parent = outer scope of the loop, not `E`) with `i` initialized to `E.vars['i']`, then STEP runs in `E'`. `E'` becomes `E` for the next iteration.
+3. This ensures closures created in each iteration capture that iteration's binding of `i` (the `Env` object) via `E`.
+
+For-in `for (x in e)`:
+1. `e` is evaluated once.
+2. Iteration is index-based: `idx = 0; while idx < len(container): { let x = container[idx]; BODY; idx += 1; }`.
+3. Each iteration creates a fresh `Env` for `x`, so closures capture per-iteration values.
+4. `break`/`continue` behave as in `while`.
 
 ### Try/Catch/Finally
 
-The pending-outcome rule is implemented in `_exec_try`:
-- The `try` block runs; any outcome (normal, `_Return`, `_Break`, `_Continue`, error, or `_Thrown`) is stored as `pending`.
-- If a `catch` clause exists and the pending outcome is a catchable error/throw, the `catch` block runs (possibly replacing the outcome).
-- The `finally` block (if present) always runs in its own scope. Its outcome replaces any pending outcome.
-- The final pending outcome is raised.
+The `_exec_try` function implements the pending-outcome rule:
 
-### Rethrow
+1. The `try` block executes.
+2. If it raises `_Thrown` or `LangError`, the `catch` handler (if present) runs; the result (None for normal, or the exception/signal) becomes the "pending" outcome.
+3. Any `_Return`/`_Break`/`_Continue` from the `try` block becomes the pending outcome (catch does NOT intercept these).
+4. If `finally` is present, it always runs.
+5. If `finally` completes normally, the pending outcome is re-raised.
+6. If `finally` exits via `return`/`break`/`continue`/`throw`/error, that replaces the pending outcome.
 
-`throw` on an `ErrorValue` re-raises the *original* exception (stored as `exc`). This preserves the original error class so a rethrown `LangIndexError` propagates as `LangIndexError`, not `LangThrownError`.
+Error values (`ErrorValue`) wrap caught runtime errors; `errkind` maps to the kind string. Rethrowing an `ErrorValue` raises the original exception (not `LangThrownError`).
 
-### Truncating Division and Modulo
+### Display rules
 
-Match C/Java semantics (truncation toward zero). Python's `//` floors toward negative infinity, so we compute:
+- Top-level: int→str, bool→"true"/"false", nil→"nil", string→bare, array→`[e, ...]`, dict→`{k: v, ...}`.
+- Nested: strings get double-quoted with four escapes re-escaped (`\\`, `\"`, `\n`, `\t`).
+- Function or error value anywhere in display → `LangTypeError`.
 
-```python
-q = abs(l) // abs(r)
-if (l < 0) != (r < 0):
-    q = -q
-```
+## Error positions
 
-For modulo: `a % b = a - (a / b) * b`, which with truncating division matches the sign of the dividend.
+Error anchor positions are propagated through the AST:
+- Binary operator errors: the operator token position is stored in the AST node.
+- Call errors (`LangArityError`, calling a non-function): the `(` position.
+- Index/key errors: the `[` position.
+- Undefined variable: the identifier token position.
+- Syntax errors: positions of the offending token.
 
-### Bool vs Int
+All positions are 1-based (line, col).
 
-Python's `bool` is a subclass of `int`, but MiniLang2 explicitly distinguishes them. The `_is_int(v)` helper checks `isinstance(v, int) and not isinstance(v, bool)`.
+## Performance considerations
 
-### Display Rules
-
-- Top-level strings are bare (no quotes).
-- Nested strings inside containers are double-quoted with `\\`, `\"`, `\n`, `\t` re-escaped.
-- Functions and error values cannot be displayed (raise `LangTypeError`).
-- Dict display preserves insertion order.
-
-### Recursion Limit
-
-`sys.setrecursionlimit(max(sys.getrecursionlimit(), 20000))` — the default 1000 is insufficient for the graded 1000-call-depth tests (each MiniLang2 call burns multiple Python frames). 20000 is safe against segfaults on CPython 3.10.
-
-## Complexity Analysis
-
-| Operation | Complexity |
-|---|---|
-| Tokenization | O(n) source chars |
-| Parsing | O(t) tokens (recursive descent is linear) |
-| Variable lookup | O(d) where d is scope chain depth |
-| Variable assignment | O(d) where d is scope chain depth |
-| Binary `+`/`-`/`*`/`**` | O(1) (Python big-int arithmetic) |
-| String concatenation | O(k) per `+`, can be O(n²) overall (as specified) |
-| Array `push` | Amortized O(1) (Python list append) |
-| Array `pop` | O(1) |
-| Dict operations | O(1) average |
-| `for (x in e)` | O(n) where n is final container length (live iteration) |
-| `for (let i=...; ...; ...)` | O(n) iterations |
-| `try`/`catch` | O(1) overhead in absence of control flow |
-| `_exec`/`_eval` dispatch | O(1) per AST node (dict lookup) |
-| Closure capture | O(1) (env reference, no copying) |
-
-## Edge Cases
-
-- `0 ** 0` returns 1 (per spec).
-- Negative exponent for `**` raises `LangValueError`.
-- Negative slice bounds raise `LangIndexError` (no wraparound).
-- `-3 ** 2` parses as `-(3 ** 2)` = `-9` (unary binds less tightly than `**`).
-- `a[len(a)] = v` is a `LangIndexError` (no append-by-assignment).
-- `d["missing"] += 1` is a `LangKeyError` (read-before-write in compound assignment).
-- `pop([])` is a `LangValueError`.
-- `break`/`continue` across `fn` boundary is a parse-time error.
-- `try` without `catch` or `finally` is a parse-time error.
-- Dict literal keys must be string literals only (parse-time).
-- Dict literal duplicate keys are parse-time errors.
-- Assignment inside expression (`print(x = 1)`) is parse-time error.
-- `for` step creates a fresh scope per iteration with only the loop variable: the step `i += 1` cannot mutate outer scope bindings directly.
-- `for-in` with live iteration: the container is evaluated once; `len(container)` is checked each iteration (index-based), so mutations (push/pop) during iteration are observable.
-- `for-in` loop variable is a fresh binding per iteration (no writeback to container).
-- `throw` of an `ErrorValue` re-raises the original error class (not `LangThrownError`).
-- `catch` does NOT intercept `return`, `break`, or `continue` — these propagate past the catch clause.
-- `finally` always runs, and its outcome (return/break/continue/throw/error) replaces any pending outcome.
-- Dict insertion order is preserved: updating an existing key keeps its position; `remove` + re-insert moves key to end.
-- Slices are shallow copies: elements that are containers are shared between original and copy.
-- Identity equality (`==`) for arrays, dicts, functions, and error values compares by identity, not value.
-- Bool is NOT int: `true + 1` is `LangTypeError`, `true == 1` is `false`, `a[true]` is `LangTypeError`.
-- String ordering is `LangTypeError`: `"a" < "b"` is not allowed.
-- Dict reading with non-string key is `LangTypeError`.
-- All negative indices (including slice bounds) raise `LangIndexError`; no Python-style wraparound.
-- Slice bounds larger than `len(x)` clamp to `len(x)`; if `lo > hi` after clamping, result is empty.
-- Assignment targets must be an identifier or an index chain (`a[i][j]`); call results and slices are invalid.
-- Compound assignment on dict: the read step checks key existence even though the write step would insert.
+- Single pass tokenization, single pass parsing, tree-walking evaluation — never retokenize or reparse.
+- Environment lookup is a simple linked-list walk: O(depth) per access.
+- No deep copying of values; arrays/dicts are Python lists/dicts with reference semantics.
+- `sys.setrecursionlimit` is raised to 20000 at the start of `run` to handle 1000-level recursive MiniLang2 calls (each MiniLang2 call uses several Python stack frames).
+- Arithmetic operations, comparison, and control flow are all O(1) Python operations.
