@@ -1,6 +1,6 @@
 # Testbench report
 
-Generated 2026-07-20T06:37:11+00:00 from 159 run(s). Raw data: `results.csv`, `runs/*/result.json`.
+Generated 2026-07-20T16:16:38+00:00 from 160 run(s). Raw data: `results.csv`, `runs/*/result.json`.
 
 `*` = every run of this cell was interrupted (provider outage/stall); the best attempt is shown as a lower bound.
 
@@ -8,12 +8,12 @@ Generated 2026-07-20T06:37:11+00:00 from 159 run(s). Raw data: `results.csv`, `r
 
 Median SAIA requests actually charged per run (budget-counter delta, includes failed/5xx requests). `~N` = LLM-response count fallback when no budget snapshot bracketed the run; `(i)` = interrupted lower-bound cell.
 
-| task | planbuild | planbuild-ds4-coder | planbuild-dsv4 | planbuild-p_coder-b_coder | planbuild-p_coder-b_dsv4 | planbuild-p_coder-b_glm47 | planbuild-p_coder-b_qwen36 | planbuild-p_mistral-b_coder | planbuild-p_mistral-b_dsv4 | planbuild-p_mistral-b_glm47 | planbuild-p_mistral-b_qwen36 | planbuild-p_qwen35-b_coder | planbuild-p_qwen35-b_dsv4 | planbuild-p_qwen35-b_glm47 | planbuild-p_qwen35-b_qwen36 | plansolo | solo-dsv4 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| csv-bugfix | 59 | 34 | 98 | ~22 | ~27 | ~16 | ~31 | — | — | — | — | — | — | — | — | 20 | 26 |
-| minilang | 16 | 56 | 19 | 11 | 34 | 38 | 61 | 18 | 9 | 11 | 11 | 37 | 17 | 62 | 21 | — | — |
-| minilang2 | 74 | 13 | 26 | 51 | 97 | 12 | 23 | 20 | 122 | 45 | 19 | 23 | 22 | 18 | 19 | — | — |
-| spreadsheet | 22 | 32 | 21 | ~34 | ~24 | ~28 | ~25 | — | — | — | — | — | — | — | — | 29 | 26 |
+| task | planbuild | planbuild-ds4-coder | planbuild-dsv4 | planbuild-p_coder-b_coder | planbuild-p_coder-b_dsv4 | planbuild-p_coder-b_glm47 | planbuild-p_coder-b_qwen36 | planbuild-p_mistral-b_coder | planbuild-p_mistral-b_dsv4 | planbuild-p_mistral-b_glm47 | planbuild-p_mistral-b_qwen36 | planbuild-p_qwen35-b_coder | planbuild-p_qwen35-b_dsv4 | planbuild-p_qwen35-b_glm47 | planbuild-p_qwen35-b_qwen36 | plansolo | solo-coder | solo-dsv4 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| csv-bugfix | 59 | 34 | 98 | ~22 | ~27 | ~16 | ~31 | — | — | — | — | — | — | — | — | 20 | — | 26 |
+| minilang | 16 | 56 | 19 | 11 | 34 | 38 | 61 | 18 | 9 | 11 | 11 | 37 | 17 | 62 | 21 | — | — | — |
+| minilang2 | 74 | 13 | 26 | 51 | 97 | 12 | 23 | 20 | 122 | 45 | 19 | 23 | 22 | 18 | 19 | — | 131 | — |
+| spreadsheet | 22 | 32 | 21 | ~34 | ~24 | ~28 | ~25 | — | — | — | — | — | — | — | — | 29 | — | 26 |
 
 ## Task: csv-bugfix
 
@@ -55,6 +55,7 @@ Starter baseline (no changes made): 19/19 — combos at or below this accomplish
 
 | combo | runs | hidden tests (median) | pass rate | wall s | requests | tokens | flags |
 |---|---|---|---|---|---|---|---|
+| solo-coder | 1/1 | 200/200 | 100% | 558.1 | 125 | 6902124 | — |
 | planbuild-p_coder-b_coder | 3/3 | 199/200 | 100% | 714.8 | 52 | 4649048 | — |
 | planbuild-p_mistral-b_dsv4 | 3/3 | 198/200 | 99% | 1060.5 | 121 | 9145061 | — |
 | planbuild-p_coder-b_qwen36 | 3/3 | 198/200 | 99% | 662.7 | 79 | 5579578 | — |
@@ -91,20 +92,21 @@ Mean of per-task median pass rates (only over tasks the combo ran).
 
 | rank | combo | mean pass rate | tasks covered |
 |---|---|---|---|
-| 1 | planbuild-dsv4 | 99% | 4/4 |
-| 2 | planbuild-p_qwen35-b_qwen36 | 99% | 2/4 |
-| 3 | planbuild-p_coder-b_qwen36 | 99% | 4/4 |
-| 4 | planbuild-p_coder-b_dsv4 | 99% | 4/4 |
-| 5 | planbuild-p_coder-b_coder | 99% | 4/4 |
-| 6 | planbuild-p_qwen35-b_coder | 98% | 2/4 |
-| 7 | plansolo | 94% | 2/4 |
-| 8 | planbuild | 87% | 4/4 |
-| 9 | solo-dsv4 | 86% | 2/4 |
-| 10 | planbuild-p_coder-b_glm47 | 74% | 4/4 |
-| 11 | planbuild-ds4-coder | 74% | 4/4 |
-| 12 | planbuild-p_mistral-b_qwen36 | 50% | 2/4 |
-| 13 | planbuild-p_mistral-b_dsv4 | 50% | 2/4 |
-| 14 | planbuild-p_qwen35-b_glm47 | 49% | 2/4 |
-| 15 | planbuild-p_mistral-b_glm47 | 49% | 2/4 |
-| 16 | planbuild-p_mistral-b_coder | 49% | 2/4 |
-| 17 | planbuild-p_qwen35-b_dsv4 | 48% | 2/4 |
+| 1 | solo-coder | 100% | 1/4 |
+| 2 | planbuild-dsv4 | 99% | 4/4 |
+| 3 | planbuild-p_qwen35-b_qwen36 | 99% | 2/4 |
+| 4 | planbuild-p_coder-b_qwen36 | 99% | 4/4 |
+| 5 | planbuild-p_coder-b_dsv4 | 99% | 4/4 |
+| 6 | planbuild-p_coder-b_coder | 99% | 4/4 |
+| 7 | planbuild-p_qwen35-b_coder | 98% | 2/4 |
+| 8 | plansolo | 94% | 2/4 |
+| 9 | planbuild | 87% | 4/4 |
+| 10 | solo-dsv4 | 86% | 2/4 |
+| 11 | planbuild-p_coder-b_glm47 | 74% | 4/4 |
+| 12 | planbuild-ds4-coder | 74% | 4/4 |
+| 13 | planbuild-p_mistral-b_qwen36 | 50% | 2/4 |
+| 14 | planbuild-p_mistral-b_dsv4 | 50% | 2/4 |
+| 15 | planbuild-p_qwen35-b_glm47 | 49% | 2/4 |
+| 16 | planbuild-p_mistral-b_glm47 | 49% | 2/4 |
+| 17 | planbuild-p_mistral-b_coder | 49% | 2/4 |
+| 18 | planbuild-p_qwen35-b_dsv4 | 48% | 2/4 |
