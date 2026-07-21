@@ -162,3 +162,12 @@ run_id,task,combo,passed,tests_total,pass_rate,wall_s,requests,budget_spent,tool
 20260721T065548Z_minilang2_planbuild-ds4-coder_r1,minilang2,planbuild-ds4-coder,200,200,1.0,292.1,27,28,35,1780545,31825,0,1812370,0.0,False,
 20260721T070044Z_minilang2_planbuild-ds4-coder_r2,minilang2,planbuild-ds4-coder,200,200,1.0,113.2,21,22,26,1659402,6065,0,1665467,0.0,False,
 20260721T070240Z_minilang2_planbuild-ds4-coder_r3,minilang2,planbuild-ds4-coder,200,200,1.0,59.4,16,17,23,1012409,2411,0,1014820,0.0,False,
+20260721T070350Z_minilang2_solo_r1,minilang2,solo,200,200,1.0,1022.6,162,,161,13668189,87453,0,13755642,0.0,True,agent_fallback_p1;expected_agent_missing_in_db
+20260721T070352Z_minilang2_solo_r2,minilang2,solo,200,200,1.0,669.7,94,,93,5825359,65669,0,5891028,0.0,True,agent_fallback_p1;expected_agent_missing_in_db
+20260721T070353Z_minilang2_solo_r3,minilang2,solo,200,200,1.0,80.8,24,,23,1180073,4910,0,1184983,0.0,True,agent_fallback_p1;expected_agent_missing_in_db
+20260721T072054Z_minilang2_solo_r3,minilang2,solo,200,200,1.0,1088.1,70,,67,4876009,54263,0,4940072,0.0,True,agent_fallback_p1;expected_agent_missing_in_db
+20260721T073904Z_minilang2_solo_r2,minilang2,solo,200,200,1.0,569.2,33,,32,1519392,31317,0,1550709,0.0,True,agent_fallback_p1;expected_agent_missing_in_db
+20260721T074835Z_minilang2_solo_r1,minilang2,solo,200,200,1.0,738.9,94,,93,6147272,50627,0,6197899,0.0,True,agent_fallback_p1;expected_agent_missing_in_db
+20260721T080407Z_minilang2_solo-dsv4_r1,minilang2,solo-dsv4,200,200,1.0,1800.2,120,,119,14021685,92051,0,14113736,0.0,False,timeout_p1
+20260721T080408Z_minilang2_solo-dsv4_r2,minilang2,solo-dsv4,200,200,1.0,1800.2,133,,132,10071904,63044,0,10134948,0.0,False,timeout_p1
+20260721T080410Z_minilang2_solo-dsv4_r3,minilang2,solo-dsv4,200,200,1.0,1800.2,150,,149,15597781,85238,0,15683019,0.0,False,timeout_p1
