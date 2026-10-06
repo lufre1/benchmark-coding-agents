@@ -20,20 +20,21 @@ fi
 
 # Protect this process from OOM killer — lower oom_score_adj so the kernel
 # prefers to kill other processes (like LLM subprocesses) before the bench.
-if [ -w /proc/self/oom_score_adj ]; then
-    echo -500 > /proc/self/oom_score_adj
-fi
+# Lowering it needs CAP_SYS_RESOURCE, so an unprivileged user unit gets
+# EACCES even though the file is writable — best effort only.
+echo -500 2>/dev/null > /proc/self/oom_score_adj || true
 
 {
     echo "$(date -Is) campaign start (args: --repeats 3 ${CAMPAIGN_ARGS:-} $*)"
-    free -h | tee -a campaign.log
+    free -h
     # shellcheck disable=SC2086
-    python3 bench.py run --repeats 3 ${CAMPAIGN_ARGS:-} "$@"
-    rc=$?
+    rc=0
+    python3 bench.py run --repeats 3 ${CAMPAIGN_ARGS:-} "$@" || rc=$?
     if [[ "$*" != *--dry-run* ]]; then
-        python3 bench.py report
+        python3 bench.py report || true
     fi
     echo "$(date -Is) campaign complete (exit code $rc)"
-    free -h | tee -a campaign.log
+    free -h
+    exit "$rc"
 } 2>&1 | tee -a campaign.log
-exit "${rc}"
+exit "${PIPESTATUS[0]}"

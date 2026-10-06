@@ -1,0 +1,16 @@
+[Unit]
+Description=SAIA gateway for the coding-agent benchmark (key rotation, pacing, per-run accounting)
+# One process owns the key state; bench.py registers each run with it.
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/benchmark-coding-agents
+# 172.17.0.1 = docker0: reached by agent containers through the saia-gw relay.
+# The gateway retries that bind every 30s while docker is not up yet.
+ExecStart=/usr/bin/python3 %h/benchmark-coding-agents/saia_gateway.py serve --listen 127.0.0.1:8787 --listen 172.17.0.1:8787
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

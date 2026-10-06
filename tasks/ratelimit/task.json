@@ -2,5 +2,10 @@
   "name": "ratelimit",
   "description": "Greenfield (medium): token-bucket rate limiter with injectable clock, per-key state",
   "timeout_s": 900,
-  "expects": ["ratelimit.py"]
+  "expects": [
+    "ratelimit.py"
+  ],
+  "subsets": [
+    "inhouse"
+  ]
 }

