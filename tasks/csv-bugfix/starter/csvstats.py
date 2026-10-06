@@ -12,24 +12,7 @@ import math
 def sniff_delimiter(text):
     """Guess the delimiter (',' or ';') from the first line."""
     first_line = text.splitlines()[0] if text else ""
-    if not first_line:
-        return ","
-    # When sniffing, we need to handle the case where a delimiter appears inside quotes
-    # The issue: csv.reader respects quotes, so with delimiter=',' and text='"name;id",score'
-    # we get 2 fields. With delimiter=';' we also get 1 field because comma is not ignored.
-    #
-    # The fix: use a more robust approach - count fields by actually parsing with each
-    # delimiter and see which produces more "sensible" results. For CSVs, the correct
-    # delimiter should produce more fields (since it properly separates fields).
-    
-    comma_reader = csv.reader(io.StringIO(first_line), delimiter=',')
-    semicolon_reader = csv.reader(io.StringIO(first_line), delimiter=';')
-    comma_fields = len(list(comma_reader)[0])
-    semicolon_fields = len(list(semicolon_reader)[0])
-    
-    # Return the delimiter that produces more fields
-    # This handles both cases correctly
-    if semicolon_fields > comma_fields:
+    if ";" in first_line:
         return ";"
     return ","
 
@@ -53,13 +36,10 @@ def to_float(value):
     if value is None:
         return None
     text = value.strip()
-    if text.lower() in ("", "na", "null", "none"):
+    if text.lower() in ("", "na"):
         return None
     try:
-        result = float(text)
-        if math.isnan(result):
-            return None
-        return result
+        return float(text)
     except ValueError:
         return None
 
@@ -82,16 +62,10 @@ def quantile(values, q):
     if not 0 <= q <= 1:
         raise ValueError("q must be in [0, 1]")
     ordered = sorted(values)
-    n = len(ordered)
-    pos = q * (n - 1)
-    lower = int(pos)
-    upper = lower + 1
-    # Clamp upper to stay within bounds
-    if upper >= n:
-        upper = n - 1
-    # Linear interpolation
-    weight = pos - lower
-    return ordered[lower] * (1 - weight) + ordered[upper] * weight
+    idx = int(q * len(ordered))
+    if idx >= len(ordered):
+        idx = len(ordered) - 1
+    return ordered[idx]
 
 
 def column_stats(rows, column):
@@ -108,29 +82,24 @@ def column_stats(rows, column):
     }
 
 
-def top_k(rows, column, k=5, exclude=None):
+def top_k(rows, column, k=5, exclude=[]):
     """Return the k rows with the largest numeric value in `column`.
 
     Values listed in `exclude` are skipped. Rows whose value equals an
     already-picked value are skipped too (each value appears at most once).
     """
-    if exclude is None:
-        exclude_set = set()
-    else:
-        exclude_set = set(exclude)
 
     def sort_key(row):
         v = to_float(row.get(column))
         return -math.inf if v is None else v
 
     picked = []
-    seen_values = set()
     for row in sorted(rows, key=sort_key, reverse=True):
         v = to_float(row.get(column))
-        if v is None or v in exclude_set or v in seen_values:
+        if v is None or v in exclude:
             continue
         picked.append(row)
-        seen_values.add(v)
+        exclude.append(v)
         if len(picked) == k:
             break
     return picked
