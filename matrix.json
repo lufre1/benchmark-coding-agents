@@ -3,6 +3,7 @@
     "timeout_s": 900,
     "eval_timeout_s": 300,
     "budget_floor_hour": 25,
+    "budget_floor_run": 200,
     "stall_timeout_s": 300,
     "provider_cooldown_s": 600,
     "auto_approve": true,

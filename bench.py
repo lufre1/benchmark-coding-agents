@@ -130,9 +130,10 @@ def _stamp(entry):
 
 
 def read_budget():
-    """Merged budget snapshot from the opencode plugin and the SAIA gateway
-    (both key-labelled the same way): per key the freshest counts win, a key
-    either writer saw rejected stays dead, exhaustion stamps are OR-ed."""
+    """Merged budget snapshot from the opencode plugin and the SAIA gateway:
+    per key the freshest counts win, a key either writer saw rejected stays
+    dead, exhaustion stamps are OR-ed. Keys are matched on the label's key
+    suffix ("key3(…31bf)" -> "31bf"): the two writers number keys differently."""
     snaps = [s for s in (_read_snapshot(BUDGET_FILE), _read_snapshot(GATEWAY_BUDGET_FILE)) if s]
     if not snaps:
         return None
@@ -141,7 +142,8 @@ def read_budget():
     merged = {}
     for snap in snaps:
         for entry in snap.get("keys") or []:
-            label = entry.get("label")
+            m = re.search(r"\(…(\w+)\)", entry.get("label") or "")
+            label = m.group(1) if m else entry.get("label")
             cur = merged.get(label)
             if cur is None or _stamp(entry) > _stamp(cur):
                 new = dict(entry)
@@ -171,16 +173,19 @@ def keyring_size():
 def budget_view(snap):
     """Aggregate remaining counts across keys. Handles both the multi-key
     snapshot format ({keys: [{label, updatedAt, remaining}], ...}) and the
-    old single-key one. Mirroring the plugin's freshBudget(): a key without
-    fresh (<65 min) data counts as full — its buckets have likely reset.
-    Dead (401/403) keys count as empty, exhausted buckets as empty until
-    their reset TTL has passed."""
+    old single-key one. A bucket's last count holds until it may have reset,
+    then counts as full: 65 min for the hour (the plugin's freshBudget()),
+    the gateway's exhaustion TTLs for day and month (a 65-min rule there
+    would reopen the gate during a daily-budget wait). Dead (401/403) keys
+    count as empty, exhausted buckets as empty until their reset TTL has
+    passed."""
     entries = snap.get("keys")
     if not isinstance(entries, list) or not entries:
         entries = [{"updatedAt": snap.get("updatedAt"),
                     "remaining": snap.get("remaining")}]
     view = {"hour": 0, "day": 0, "month": 0}
     ttl = {"hour": 3600, "day": 86400, "month": 30 * 86400}
+    hold = {**ttl, "hour": 65 * 60}
     any_fresh = False
     dead = 0
     now = datetime.now(timezone.utc)
@@ -190,10 +195,10 @@ def budget_view(snap):
             continue
         try:
             updated = datetime.fromisoformat(entry["updatedAt"].replace("Z", "+00:00"))
-            fresh = timedelta(0) <= now - updated <= timedelta(minutes=65)
+            age = (now - updated).total_seconds()
         except (KeyError, TypeError, ValueError, AttributeError):
-            fresh = False  # never-used keys have updatedAt: null
-        any_fresh = any_fresh or fresh
+            age = -1  # never-used keys have updatedAt: null
+        any_fresh = any_fresh or 0 <= age <= hold["hour"]
         remaining = entry.get("remaining") or {}
         exhausted = entry.get("exhausted") or {}
         for bucket in view:
@@ -201,7 +206,7 @@ def budget_view(snap):
             if stamp and now.timestamp() * 1000 - stamp < ttl[bucket] * 1000:
                 continue
             value = remaining.get(bucket)
-            view[bucket] += (value if fresh and isinstance(value, (int, float))
+            view[bucket] += (value if 0 <= age <= hold[bucket] and isinstance(value, (int, float))
                              else BUCKET_LIMITS[bucket])
     # Keys in rotation but missing from the snapshot (never used yet, e.g.
     # freshly added extras) count as full.
@@ -214,12 +219,13 @@ def budget_view(snap):
     return view
 
 
-def budget_gate(floor, wait):
-    """Block until the aggregated SAIA hourly request budget (across all
-    keys) is above `floor`. Returns the full budget snapshot (or None if
-    the budget file is unreadable). Entirely stale data counts as
-    replenished."""
-    max_wait = 90 * 60  # 90 minutes — abort if the budget hasn't reset by then
+def budget_gate(floor, wait, run_floor=0):
+    """Block until the aggregated SAIA budget (across all keys) can carry a
+    run: hourly above `floor` (waits up to 90 min), daily above `run_floor`
+    (waits for the daily reset, however long — multi-day campaigns). A
+    monthly budget below `run_floor` ends the campaign. Returns the full
+    budget snapshot (or None if the budget file is unreadable)."""
+    max_wait = 90 * 60  # 90 minutes — abort if the hourly budget hasn't reset by then
     waited = 0
     while True:
         snap = read_budget()
@@ -227,13 +233,19 @@ def budget_gate(floor, wait):
             log("WARNING: no budget file readable, proceeding blind")
             return None
         view = budget_view(snap)
-        if not view["fresh"] or view["hour"] >= floor:
+        if view["month"] < run_floor:
+            sys.exit(f"ABORT: monthly SAIA budget spent (~{view['month']} < {run_floor} "
+                     "requests left across live keys)")
+        if view["hour"] >= floor and view["day"] >= run_floor:
             return snap
-        if view["day"] < floor:
-            sys.exit(f"ABORT: daily SAIA budget nearly exhausted (~{view['day']} requests left)")
         if not wait:
-            sys.exit(f"ABORT: hourly SAIA budget too low (~{view['hour']} < floor {floor}); "
+            sys.exit(f"ABORT: SAIA budget too low (~{view['hour']}/hour, ~{view['day']}/day); "
                      "rerun without --no-wait to wait")
+        if view["day"] < run_floor:
+            log(f"daily budget ~{view['day']} < {run_floor} across {view['key_count']} key(s) "
+                "— waiting for the daily reset")
+            time.sleep(600)
+            continue
         waited += 120
         eta = max(0, max_wait - waited)
         log(f"hourly budget ~{view['hour']} across {view['key_count']} key(s) "
@@ -580,7 +592,8 @@ def do_legacy_run(task, combo_name, combo, defaults, repeat, args):
             log(f"  workspace opencode.json agent models: {combo['models']}")
         return None
 
-    budget_before = budget_gate(defaults["budget_floor_hour"], wait=not args.no_wait)
+    budget_before = budget_gate(defaults["budget_floor_hour"], wait=not args.no_wait,
+                                run_floor=defaults.get("budget_floor_run", 0))
     run_dir.mkdir(parents=True)
     workspace.mkdir(parents=True)
     starter = task["dir"] / "starter"
@@ -828,7 +841,8 @@ def do_agent_run(task, combo_name, combo, defaults, repeat, args):
     if gw.health() is None:
         sys.exit("ABORT: SAIA gateway not reachable at "
                  f"{gw.admin} — start it: systemctl --user start saia-gateway")
-    budget_before = budget_gate(defaults["budget_floor_hour"], wait=not args.no_wait)
+    budget_before = budget_gate(defaults["budget_floor_hour"], wait=not args.no_wait,
+                                run_floor=defaults.get("budget_floor_run", 0))
     health_before = health_gate(gw, defaults, wait=not args.no_wait)
     run_dir.mkdir(parents=True)
     (run_dir / "prompt.md").write_text(task["prompt"])
@@ -1005,6 +1019,21 @@ def select_tasks(args, tasks):
     return [t for t in tasks.values() if not t.get("retired")]
 
 
+def done_cells():
+    """(task, combo, repeat) cells with a valid result in runs/. Archived
+    runs (runs/_smoke-*/...) are nested one level deeper and don't count."""
+    done = set()
+    for path in RUNS_DIR.glob("*/result.json"):
+        try:
+            r = read_json(path)
+        except (OSError, ValueError):
+            continue
+        m = re.search(r"_r(\d+)$", r.get("run_id") or "")
+        if m and not r.get("invalid"):
+            done.add((r.get("task"), r.get("combo"), int(m.group(1))))
+    return done
+
+
 def cmd_run(args):
     matrix = load_matrix()
     defaults = matrix["defaults"]
@@ -1016,6 +1045,11 @@ def cmd_run(args):
             for task in selected_tasks
             for name, combo in combos.items()
             for rep in range(1, args.repeats + 1)]
+    if args.skip_done:
+        done = done_cells()
+        kept = [p for p in plan if (p[0]["name"], p[1], p[3]) not in done]
+        log(f"--skip-done: {len(plan) - len(kept)} cell(s) already have a valid result")
+        plan = kept
     log(f"{len(plan)} run(s) planned: tasks={[t['name'] for t in selected_tasks]} "
         f"combos={list(combos)} repeats={args.repeats}")
     RUNS_DIR.mkdir(exist_ok=True)
@@ -1324,7 +1358,7 @@ def cmd_report(args):
     if not results:
         log("no results yet")
         return
-    csv_path = ROOT / "results.csv"
+    csv_path = RUNS_DIR.parent / "results.csv"  # next to runs/: a scratch BENCH_RUNS_DIR keeps the repo report
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
         writer.writeheader()
@@ -1428,7 +1462,7 @@ def cmd_report(args):
         lines.append(f"| {rank} | {combo} | {rate:.0%} | {covered}/{len(tasks_seen)} |")
     lines.append("")
 
-    report_path = ROOT / "report.md"
+    report_path = RUNS_DIR.parent / "report.md"
     report_path.write_text("\n".join(lines))
     log(f"wrote {csv_path} and {report_path}")
 
@@ -1610,6 +1644,9 @@ def main():
                             help="where agent combos run (default from matrix.json; DeepSWE "
                                  "always docker)")
     run_parser.add_argument("--repeats", type=int, default=1)
+    run_parser.add_argument("--skip-done", action="store_true",
+                            help="skip task/combo/repeat cells that already have a valid "
+                                 "result in runs/ (resume a campaign)")
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--no-wait", action="store_true",
                             help="abort instead of waiting when budget is low")

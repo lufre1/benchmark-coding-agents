@@ -35,6 +35,7 @@ plus the in-house tasks. The original opencode-only matrix still runs as the
 | `python3 bench.py run --dry-run ...` | Print planned (docker) commands, write nothing |
 | `python3 bench.py import-deepswe [--id <reserve>]` | Import the pinned DeepSWE subset into `tasks/` |
 | `python3 bench.py import-deepswe --n-tasks 12 --sample-seed 0` | Seeded random sample of all 113 tasks (pier's algorithm on sorted ids), subset `seed0` |
+| `systemd-run --user --unit deepswe-seed0 -p WorkingDirectory=$PWD sg docker -c "exec python3 bench.py run --task <seed order> --combo <7 agents> --parallel 2 --skip-done"` | Seed-0 campaign: tasks in seed order (task-major, so a budget-truncated campaign is a seed-0 prefix with all 7 agents per task); `--skip-done` resumes. `sg docker`: the user manager predates the docker-group membership. Running since 2026-10-06 (10 tasks; `eicrud-keyset-pagination-cursor` failed validation — its MongoDB suite fails even with the reference solution — replaced by seed-0 #11 `valibot-recursive-schema-composition`) |
 | `python3 bench.py pull-deepswe` / `validate-deepswe` | Pre-pull images / oracle=1, null=0 gate (required before runs) |
 | `python3 bench.py gc` | Remove orphaned bench containers |
 | `python3 bench.py report` | Regenerate `results.csv` + `report.md` |
@@ -72,7 +73,7 @@ SAIA degrades for hours at a time (2026-10-05/06: 0–30% of attempts succeeding
 
 ## Budget gating
 
-`budget_gate` blocks (2 min polls, up to 90 min) while fewer than `budget_floor_hour` (25) hourly requests remain across live keys; dead keys count as 0, exhausted buckets as 0 until their TTL. `--no-wait` aborts instead. Limits per key: 30/min, 200/hour, 1000/day, **3000/month** — the monthly bucket is what bounds the campaign (3 live keys ≈ 9k/month; key1 is dead since 2026-10-05).
+`budget_gate` blocks (2 min polls, up to 90 min) while fewer than `budget_floor_hour` (25) hourly requests remain across live keys, waits for the daily reset (10 min polls, no cap) while fewer than `budget_floor_run` (200 ≈ one run) daily requests remain, and ends the campaign once fewer than `budget_floor_run` monthly requests remain. Dead keys count as 0, exhausted buckets as 0 until their TTL; a stale count holds 65 min (hour) / 24 h (day) / 30 d (month). Plugin and gateway number keys differently, so their snapshots are merged on the key suffix `(…xxxx)`. `--no-wait` aborts instead. Limits per key: 30/min, 200/hour, 1000/day, **3000/month** — the monthly bucket is what bounds the campaign (3 live keys ≈ 9k/month; key1 is dead since 2026-10-05).
 
 ## Combo definitions (`matrix.json`)
 
@@ -105,7 +106,7 @@ Runs flagged `invalid` are excluded from aggregate scores:
 
 Recorded but valid: `request_cap`, `idle_kill` (agent hung itself), `timeout_p<n>`, `model_rewritten`, `canary_read`, `uncommitted_changes`, `commits_not_on_head`, `collect_failed`, `fault_injected`.
 
-Invalid runs are retried up to 3 times with 10/30/60 min backoff (unless `--no-retry`; harness errors are not retried).
+Invalid runs are retried up to 3 times with 10/30/60 min backoff (unless `--no-retry`; harness errors are not retried). `run --skip-done` skips task/combo/repeat cells that already have a valid top-level `runs/*/result.json` (archived `runs/_*/` don't count).
 
 ## Task details (in-house)
 

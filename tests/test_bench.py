@@ -111,6 +111,64 @@ class BudgetMerge(unittest.TestCase):
         bench.KEYS_FILE.write_text(json.dumps({"keys": []}))
         self.assertEqual(bench.budget_view(bench.read_budget())["hour"], 0)
 
+    def test_same_key_under_different_labels_counts_once(self):
+        now = iso(datetime.now(timezone.utc))
+        rem = {"minute": 20, "hour": 100, "day": 400, "month": 1500}
+        bench.BUDGET_FILE.write_text(json.dumps({"updatedAt": now, "keys": [  # plugin numbering
+            {"label": "key1(…bbbb)", "updatedAt": now, "remaining": rem},
+            {"label": "key2(…aaaa)", "updatedAt": None, "remaining": {}}]}))
+        bench.GATEWAY_BUDGET_FILE.write_text(json.dumps({"updatedAt": now, "keys": [
+            {"label": "key1(…aaaa)", "updatedAt": now, "remaining": rem},
+            {"label": "key2(…bbbb)", "updatedAt": now, "remaining": rem}]}))
+        bench.KEYS_FILE.write_text(json.dumps({"keys": ["b"]}))  # 2 keys in rotation
+        view = bench.budget_view(bench.read_budget())
+        self.assertEqual((view["key_count"], view["month"]), (2, 3000))
+
+    def test_gate_waits_for_day_and_stops_at_month(self):
+        old = iso(datetime.now(timezone.utc) - timedelta(hours=3))
+        bench.KEYS_FILE.write_text(json.dumps({"keys": []}))
+
+        def snap(day, month):
+            bench.GATEWAY_BUDGET_FILE.write_text(json.dumps({"updatedAt": old, "keys": [
+                {"label": "k1", "updatedAt": old,
+                 "remaining": {"hour": 5, "day": day, "month": month}}]}))
+
+        snap(50, 100)  # a 3 h old count: hour counts as refilled, day/month still hold
+        view = bench.budget_view(bench.read_budget())
+        self.assertEqual((view["hour"], view["day"], view["month"]), (200, 50, 100))
+        with self.assertRaises(SystemExit):
+            bench.budget_gate(25, wait=True, run_floor=200)
+
+        class Waited(Exception):
+            pass
+
+        def sleep(_):
+            raise Waited
+
+        snap(50, 2000)
+        saved, bench.time.sleep = bench.time.sleep, sleep
+        try:
+            with self.assertRaises(Waited):  # waits for the daily reset instead of aborting
+                bench.budget_gate(25, wait=True, run_floor=200)
+        finally:
+            bench.time.sleep = saved
+
+
+class DoneCells(unittest.TestCase):
+    def test_only_valid_top_level_runs_count(self):
+        tmp = Path(tempfile.mkdtemp())
+        saved, bench.RUNS_DIR = bench.RUNS_DIR, tmp
+        try:
+            for rel, invalid in (("t1_t_c_r1", False), ("t2_t_c_r2", True),
+                                 ("_archive/t3_t_c_r3", False)):
+                (tmp / rel).mkdir(parents=True)
+                (tmp / rel / "result.json").write_text(json.dumps(
+                    {"run_id": Path(rel).name, "task": "t", "combo": "c", "invalid": invalid}))
+            self.assertEqual(bench.done_cells(), {("t", "c", 1)})
+        finally:
+            bench.RUNS_DIR = saved
+            shutil.rmtree(tmp)
+
 
 class RetroFlags(unittest.TestCase):
     def run_dir(self, events=""):

