@@ -6,3 +6,5 @@ __pycache__/
 *.lock
 .~lock.*#
 .watch*
+outages.md
+outages.csv

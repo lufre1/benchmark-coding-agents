@@ -1,6 +1,6 @@
 # Testbench report
 
-Generated 2026-10-06T10:08:34+00:00 from 184 run(s). Raw data: `results.csv`, `runs/*/result.json`.
+Generated 2026-10-06T14:15:57+00:00 from 186 run(s). Raw data: `results.csv`, `runs/*/result.json`.
 
 `*` = every run of this cell was interrupted (provider outage/stall); the best attempt is shown as a lower bound.
 
@@ -8,25 +8,27 @@ Generated 2026-10-06T10:08:34+00:00 from 184 run(s). Raw data: `results.csv`, `r
 
 All agents run the same pinned model through saia_gateway.py. DeepSWE cells: reward (median of valid runs) / mean F2P pass fraction / median requests. In-house cells: hidden-test pass rate / — / median requests. `inv` = only invalid runs.
 
-| task | pi-ds |
-|---|---|
-| deepswe-true-myth-iterable-collection-combinators | 100% / 100% / 65 |
+| task | aider-ds | oc-planbuild-ds | pi-ds |
+|---|---|---|---|
+| deepswe-true-myth-iterable-collection-combinators | inv | inv | 100% / 100% / 65 |
 
 | combo | agent | valid/all | mean reward | mean F2P | solves per 1k requests | median wall s | median prompt tok/request | flags seen |
 |---|---|---|---|---|---|---|---|---|
+| aider-ds | aider | 0/1 | 0% | 0% | 0.0 | 0 | 0 | provider_error |
+| oc-planbuild-ds | opencode | 0/1 | 0% | 0% | 0.0 | 0 | 0 | exit_1_p2, provider_error, uncommitted_changes |
 | pi-ds | pi | 1/1 | 100% | 100% | 15.4 | 2179.2 | 89882 | — |
 
 ## API requests per task × combo
 
 Median SAIA requests actually charged per run (gateway upstream attempts, or the budget-counter delta for legacy runs; includes failed/5xx requests). `~N` = LLM-response count fallback when no budget snapshot bracketed the run; `(i)` = interrupted lower-bound cell.
 
-| task | pi-ds | planbuild | planbuild-ds4-coder | planbuild-dsv4 | planbuild-p_coder-b_coder | planbuild-p_coder-b_dsv4 | planbuild-p_coder-b_glm47 | planbuild-p_coder-b_qwen36 | planbuild-p_mistral-b_coder | planbuild-p_mistral-b_dsv4 | planbuild-p_mistral-b_glm47 | planbuild-p_mistral-b_qwen36 | planbuild-p_qwen35-b_coder | planbuild-p_qwen35-b_dsv4 | planbuild-p_qwen35-b_glm47 | planbuild-p_qwen35-b_qwen36 | plansolo | solo | solo-coder | solo-dsv4 | solo-qwen35 | solo-qwen36 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| csv-bugfix | — | 25 (i) | 43 (i) | 190 | ~35 (i) | ~33 (i) | ~15 (i) | ~26 (i) | — | — | — | — | — | — | — | — | 20 (i) | — | — | 26 (i) | — | — |
-| deepswe-true-myth-iterable-collection-combinators | 77 | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| minilang | — | 7 (i) | 12 (i) | 19 (i) | 77 (i) | 18 (i) | 57 (i) | 76 (i) | 18 (i) | 51 (i) | 18 (i) | 11 (i) | 39 (i) | 17 (i) | 45 (i) | 14 (i) | — | — | — | — | — | — |
-| minilang2 | — | 129 (i) | 28 (i) | 26 | 5 (i) | 118 (i) | 16 (i) | 23 (i) | 24 (i) | 129 (i) | 117 (i) | 61 (i) | 23 (i) | 82 (i) | 34 (i) | 15 (i) | — | ~162 (i) | 131 (i) | ~120 (i) | ~25 (i) | ~52 (i) |
-| spreadsheet | — | 21 (i) | 32 (i) | 18 | ~26 (i) | ~24 (i) | ~34 (i) | ~23 (i) | — | — | — | — | — | — | — | — | 40 (i) | — | — | 26 (i) | — | — |
+| task | aider-ds | oc-planbuild-ds | pi-ds | planbuild | planbuild-ds4-coder | planbuild-dsv4 | planbuild-p_coder-b_coder | planbuild-p_coder-b_dsv4 | planbuild-p_coder-b_glm47 | planbuild-p_coder-b_qwen36 | planbuild-p_mistral-b_coder | planbuild-p_mistral-b_dsv4 | planbuild-p_mistral-b_glm47 | planbuild-p_mistral-b_qwen36 | planbuild-p_qwen35-b_coder | planbuild-p_qwen35-b_dsv4 | planbuild-p_qwen35-b_glm47 | planbuild-p_qwen35-b_qwen36 | plansolo | solo | solo-coder | solo-dsv4 | solo-qwen35 | solo-qwen36 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| csv-bugfix | — | — | — | 25 (i) | 43 (i) | 190 | ~35 (i) | ~33 (i) | ~15 (i) | ~26 (i) | — | — | — | — | — | — | — | — | 20 (i) | — | — | 26 (i) | — | — |
+| deepswe-true-myth-iterable-collection-combinators | 9 (i) | 54 (i) | 77 | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| minilang | — | — | — | 7 (i) | 12 (i) | 19 (i) | 77 (i) | 18 (i) | 57 (i) | 76 (i) | 18 (i) | 51 (i) | 18 (i) | 11 (i) | 39 (i) | 17 (i) | 45 (i) | 14 (i) | — | — | — | — | — | — |
+| minilang2 | — | — | — | 129 (i) | 28 (i) | 26 | 5 (i) | 118 (i) | 16 (i) | 23 (i) | 24 (i) | 129 (i) | 117 (i) | 61 (i) | 23 (i) | 82 (i) | 34 (i) | 15 (i) | — | ~162 (i) | 131 (i) | ~120 (i) | ~25 (i) | ~52 (i) |
+| spreadsheet | — | — | — | 21 (i) | 32 (i) | 18 | ~26 (i) | ~24 (i) | ~34 (i) | ~23 (i) | — | — | — | — | — | — | — | — | 40 (i) | — | — | 26 (i) | — | — |
 
 ## Task: csv-bugfix
 
@@ -51,6 +53,8 @@ Validation: oracle reward 1, untouched repo F2P 0/96 (P2P 561/561).
 | combo | runs | hidden tests (median) | pass rate | wall s | requests | tokens | flags |
 |---|---|---|---|---|---|---|---|
 | pi-ds | 1/1 | 1/1 | 100% | 2179.2 | 65 | 5893200 | — |
+| oc-planbuild-ds* | 1/1 | 0/1 | 0% | 1877.1 | 37 | 3781588 | exit_1_p2, provider_error, uncommitted_changes |
+| aider-ds* | 1/1 | 0/1 | 0% | 1536.8 | 7 | 173561 | provider_error |
 
 ## Task: minilang
 
@@ -139,3 +143,5 @@ Mean of per-task median pass rates (only over tasks the combo ran).
 | 20 | solo-dsv4 | 98% | 3/5 |
 | 21 | plansolo | 96% | 2/5 |
 | 22 | planbuild-p_mistral-b_coder | 50% | 2/5 |
+| 23 | oc-planbuild-ds | 0% | 1/5 |
+| 24 | aider-ds | 0% | 1/5 |

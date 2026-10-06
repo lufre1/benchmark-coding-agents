@@ -124,20 +124,23 @@ class BudgetMerge(unittest.TestCase):
         view = bench.budget_view(bench.read_budget())
         self.assertEqual((view["key_count"], view["month"]), (2, 3000))
 
-    def test_gate_waits_for_day_and_stops_at_month(self):
-        old = iso(datetime.now(timezone.utc) - timedelta(hours=3))
+    def test_gate_waits_for_day_and_month(self):
+        now = datetime.now(timezone.utc)
+        old = now - timedelta(hours=3)
         bench.KEYS_FILE.write_text(json.dumps({"keys": []}))
 
-        def snap(day, month):
-            bench.GATEWAY_BUDGET_FILE.write_text(json.dumps({"updatedAt": old, "keys": [
-                {"label": "k1", "updatedAt": old,
+        def snap(day, month, updated=old):
+            bench.GATEWAY_BUDGET_FILE.write_text(json.dumps({"updatedAt": iso(updated), "keys": [
+                {"label": "k1", "updatedAt": iso(updated),
                  "remaining": {"hour": 5, "day": day, "month": month}}]}))
 
-        snap(50, 100)  # a 3 h old count: hour counts as refilled, day/month still hold
-        view = bench.budget_view(bench.read_budget())
-        self.assertEqual((view["hour"], view["day"], view["month"]), (200, 50, 100))
-        with self.assertRaises(SystemExit):
-            bench.budget_gate(25, wait=True, run_floor=200)
+        snap(50, 100)  # 3 h old: the hour counts as refilled, the day holds 24 h,
+        view = bench.budget_view(bench.read_budget())  # the month its calendar month
+        same_month = (old.year, old.month) == (now.year, now.month)
+        self.assertEqual((view["hour"], view["day"], view["month"]),
+                         (200, 50, 100 if same_month else 3000))
+        snap(500, 100, updated=now - timedelta(days=40))  # last month's count: refilled
+        self.assertEqual(bench.budget_view(bench.read_budget())["month"], 3000)
 
         class Waited(Exception):
             pass
@@ -145,29 +148,65 @@ class BudgetMerge(unittest.TestCase):
         def sleep(_):
             raise Waited
 
-        snap(50, 2000)
         saved, bench.time.sleep = bench.time.sleep, sleep
         try:
-            with self.assertRaises(Waited):  # waits for the daily reset instead of aborting
-                bench.budget_gate(25, wait=True, run_floor=200)
+            for day, month in ((50, 2000), (500, 100)):  # empty day, then empty month
+                snap(day, month, updated=now - timedelta(minutes=70))
+                with self.assertRaises(Waited):  # waits for the reset, never aborts
+                    bench.budget_gate(25, wait=True, run_floor=200)
+                with self.assertRaises(SystemExit):  # unless told not to wait
+                    bench.budget_gate(25, wait=False, run_floor=200)
         finally:
             bench.time.sleep = saved
 
 
-class DoneCells(unittest.TestCase):
-    def test_only_valid_top_level_runs_count(self):
-        tmp = Path(tempfile.mkdtemp())
-        saved, bench.RUNS_DIR = bench.RUNS_DIR, tmp
+class CellTries(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.saved, bench.RUNS_DIR = bench.RUNS_DIR, self.tmp / "runs"
+
+    def tearDown(self):
+        bench.RUNS_DIR = self.saved
+        shutil.rmtree(self.tmp)
+
+    def result(self, rel, rep, flags=(), invalid=True):
+        d = bench.RUNS_DIR / rel
+        d.mkdir(parents=True)
+        (d / "result.json").write_text(json.dumps({
+            "run_id": f"{d.name}_t_c_r{rep}", "task": "t", "combo": "c",
+            "invalid": invalid, "flags": list(flags), "gateway": {"requests": 3}}))
+
+    def test_caps_and_archives(self):
+        self.result("a", 1, invalid=False)
+        for i in range(5):
+            self.result(f"b{i}", 2, ["provider_error"])
+        self.result("c", 3, ["provider_outage_p1"])
+        self.result("d", 3, ["harness_error"])
+        self.result("_archive/e", 4, invalid=False)  # nested: doesn't count
+        plan = [({"name": "t"}, "c", {}, rep) for rep in (1, 2, 3, 4)]
+        self.assertEqual([item[3] for item in bench.pending(plan, {"saia_max_tries": 5})], [3, 4])
+        self.assertEqual(bench.cell_tries()[("t", "c", 3)], {"valid": False, "saia": 1, "other": 1})
+
+    def test_outage_report(self):
+        log = self.tmp / "requests.jsonl"
+        ok = {"key": "key2(…aaaa)", "status": 200, "ttfb_ms": 900}
+        to = {"key": "key2(…aaaa)", "err": "TimeoutError", "upstream_ms": 45000, "kong": None}
+        rows = [{"ts": "2026-10-05T22:10:00Z", "run_id": "x", "attempts": [to, to, ok]}] * 3 + [
+            {"ts": "2026-10-05T23:10:00Z", "run_id": "x", "attempts": [ok], "cause":
+             "stream_too_slow", "latency_ms": 900000}] * 3 + [
+            {"ts": "2026-10-06T09:00:00Z", "run_id": "y", "attempts": [ok]}] * 6
+        log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        self.result("b0", 2, ["provider_error"])
+        saved, bench.GATEWAY_REQUESTS_LOG = bench.GATEWAY_REQUESTS_LOG, log
         try:
-            for rel, invalid in (("t1_t_c_r1", False), ("t2_t_c_r2", True),
-                                 ("_archive/t3_t_c_r3", False)):
-                (tmp / rel).mkdir(parents=True)
-                (tmp / rel / "result.json").write_text(json.dumps(
-                    {"run_id": Path(rel).name, "task": "t", "combo": "c", "invalid": invalid}))
-            self.assertEqual(bench.done_cells(), {("t", "c", 1)})
+            bench.outage_report({"health_gate": {"min_ok_ratio": 0.7}, "model": "m"})
         finally:
-            bench.RUNS_DIR = saved
-            shutil.rmtree(tmp)
+            bench.GATEWAY_REQUESTS_LOG = saved
+        md = (self.tmp / "outages.md").read_text()
+        self.assertIn("| 2026-10-05 22:00 | 2026-10-06 00:00 | 15 | 40% |", md)  # 22+23 merged
+        self.assertIn("(1/3 measured hours ≥ 70%)", md)
+        self.assertIn("b0_t_c_r2", md)
+        self.assertEqual(len((self.tmp / "outages.csv").read_text().splitlines()), 1 + 6 + 3)
 
 
 class RetroFlags(unittest.TestCase):
@@ -314,9 +353,11 @@ class HealthGate(unittest.TestCase):
         st, gw = self.run_gate([{"attempts": 20, "ok_ratio": 0.9}])
         self.assertEqual(gw.probes, 0)
 
-    def test_no_traffic_probes_then_opens(self):
-        st, gw = self.run_gate([{"attempts": 0}, {"attempts": 1, "ok_ratio": 1.0}])
-        self.assertEqual(gw.probes, 1)
+    def test_one_good_probe_is_not_enough(self):
+        # decides only on min_attempts (default 6): keeps probing until then
+        st, gw = self.run_gate([{"attempts": 0}, {"attempts": 1, "ok_ratio": 1.0},
+                                {"attempts": 6, "ok_ratio": 1.0}])
+        self.assertEqual((st["attempts"], gw.probes), (6, 2))
 
     def test_degraded_waits_until_recovered(self):
         bad, good = {"attempts": 30, "ok_ratio": 0.3}, {"attempts": 30, "ok_ratio": 0.8}

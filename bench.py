@@ -42,11 +42,13 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import executors
+from saia_gateway import reset_passed
 from agents import (FALLBACK_RE, PhaseCmd, RunCtx, add_tokens, db_usage, empty_tokens,
                     make_adapter, parse_events)
 
@@ -56,6 +58,7 @@ RUNS_DIR = Path(os.environ.get("BENCH_RUNS_DIR", ROOT / "runs"))
 MATRIX_FILE = ROOT / "matrix.json"
 BUDGET_FILE = Path.home() / ".cache/opencode/saia-gwdg-budget.json"
 GATEWAY_BUDGET_FILE = Path.home() / ".cache/saia-gateway/budget.json"
+GATEWAY_REQUESTS_LOG = Path.home() / ".cache/saia-gateway/requests.jsonl"  # every request + attempt
 DB_FILE = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE = shutil.which("opencode") or str(Path.home() / ".opencode/bin/opencode")
 TOOLBOX_MANIFEST = executors.TOOLBOX / "manifest.json"
@@ -175,17 +178,16 @@ def budget_view(snap):
     snapshot format ({keys: [{label, updatedAt, remaining}], ...}) and the
     old single-key one. A bucket's last count holds until it may have reset,
     then counts as full: 65 min for the hour (the plugin's freshBudget()),
-    the gateway's exhaustion TTLs for day and month (a 65-min rule there
-    would reopen the gate during a daily-budget wait). Dead (401/403) keys
-    count as empty, exhausted buckets as empty until their reset TTL has
-    passed."""
+    24 h for the day (a 65-min rule would reopen the gate during a daily-
+    budget wait), the calendar month (UTC) for the month — SAIA's limits
+    are Kong fixed windows. Dead (401/403) keys count as empty, exhausted
+    buckets as empty until the gateway's reset_passed()."""
     entries = snap.get("keys")
     if not isinstance(entries, list) or not entries:
         entries = [{"updatedAt": snap.get("updatedAt"),
                     "remaining": snap.get("remaining")}]
     view = {"hour": 0, "day": 0, "month": 0}
-    ttl = {"hour": 3600, "day": 86400, "month": 30 * 86400}
-    hold = {**ttl, "hour": 65 * 60}
+    hold = {"hour": 65 * 60, "day": 86400}
     any_fresh = False
     dead = 0
     now = datetime.now(timezone.utc)
@@ -197,16 +199,18 @@ def budget_view(snap):
             updated = datetime.fromisoformat(entry["updatedAt"].replace("Z", "+00:00"))
             age = (now - updated).total_seconds()
         except (KeyError, TypeError, ValueError, AttributeError):
-            age = -1  # never-used keys have updatedAt: null
+            updated, age = None, -1  # never-used keys have updatedAt: null
         any_fresh = any_fresh or 0 <= age <= hold["hour"]
         remaining = entry.get("remaining") or {}
         exhausted = entry.get("exhausted") or {}
         for bucket in view:
             stamp = exhausted.get(bucket) or 0
-            if stamp and now.timestamp() * 1000 - stamp < ttl[bucket] * 1000:
+            if stamp and not reset_passed(bucket, stamp, now.timestamp()):
                 continue
             value = remaining.get(bucket)
-            view[bucket] += (value if 0 <= age <= hold[bucket] and isinstance(value, (int, float))
+            held = (updated is not None and (updated.year, updated.month) == (now.year, now.month)
+                    if bucket == "month" else 0 <= age <= hold[bucket])
+            view[bucket] += (value if held and isinstance(value, (int, float))
                              else BUCKET_LIMITS[bucket])
     # Keys in rotation but missing from the snapshot (never used yet, e.g.
     # freshly added extras) count as full.
@@ -221,10 +225,10 @@ def budget_view(snap):
 
 def budget_gate(floor, wait, run_floor=0):
     """Block until the aggregated SAIA budget (across all keys) can carry a
-    run: hourly above `floor` (waits up to 90 min), daily above `run_floor`
-    (waits for the daily reset, however long — multi-day campaigns). A
-    monthly budget below `run_floor` ends the campaign. Returns the full
-    budget snapshot (or None if the budget file is unreadable)."""
+    run: hourly above `floor` (waits up to 90 min), daily and monthly above
+    `run_floor` (waits for the daily / monthly reset, however long —
+    multi-day campaigns). Returns the full budget snapshot (or None if the
+    budget file is unreadable)."""
     max_wait = 90 * 60  # 90 minutes — abort if the hourly budget hasn't reset by then
     waited = 0
     while True:
@@ -233,14 +237,18 @@ def budget_gate(floor, wait, run_floor=0):
             log("WARNING: no budget file readable, proceeding blind")
             return None
         view = budget_view(snap)
-        if view["month"] < run_floor:
-            sys.exit(f"ABORT: monthly SAIA budget spent (~{view['month']} < {run_floor} "
-                     "requests left across live keys)")
-        if view["hour"] >= floor and view["day"] >= run_floor:
+        if view["hour"] >= floor and view["day"] >= run_floor and view["month"] >= run_floor:
             return snap
         if not wait:
-            sys.exit(f"ABORT: SAIA budget too low (~{view['hour']}/hour, ~{view['day']}/day); "
-                     "rerun without --no-wait to wait")
+            sys.exit(f"ABORT: SAIA budget too low (~{view['hour']}/hour, ~{view['day']}/day, "
+                     f"~{view['month']}/month); rerun without --no-wait to wait")
+        if view["month"] < run_floor:
+            now = datetime.now(timezone.utc)
+            reset = datetime(now.year + now.month // 12, now.month % 12 + 1, 1, tzinfo=timezone.utc)
+            log(f"monthly budget ~{view['month']} < {run_floor} across {view['key_count']} "
+                f"key(s) — waiting for the monthly reset ({reset:%Y-%m-%d} UTC)")
+            time.sleep(min(6 * 3600, (reset - now).total_seconds() + 300))
+            continue
         if view["day"] < run_floor:
             log(f"daily budget ~{view['day']} < {run_floor} across {view['key_count']} key(s) "
                 "— waiting for the daily reset")
@@ -321,35 +329,53 @@ def health_probe(gw):
         gw.finish(run_id)
 
 
+HEALTH_LOCK = threading.Lock()  # parallel workers share one gate and its probes
+
+
 def health_gate(gw, defaults, wait):
     """Block while SAIA is degraded: fewer than `min_ok_ratio` of the
     gateway's upstream attempts in the last `window_s` succeeded. Failed
     attempts are charged, and runs started into an outage only measure the
-    outage. Without recent traffic a probe request supplies the data."""
+    outage. Decides only on >= `min_attempts` attempts; with less traffic it
+    probes once per `poll_s` (one success after a quiet hour proves nothing).
+    `max_wait_s: 0` waits forever."""
     cfg = {"window_s": 900, "min_ok_ratio": 0.5, "min_attempts": 6, "poll_s": 600,
            "max_wait_s": 6 * 3600, **(defaults.get("health_gate") or {})}
     if not cfg.get("enabled", True):
         return None
-    key, waited = str(cfg["window_s"]), 0
-    while True:
-        st = ((gw.health() or {}).get("recent") or {}).get(key) or {}
+    key, minutes = str(cfg["window_s"]), cfg["window_s"] // 60
+
+    def stats():
+        return ((gw.health() or {}).get("recent") or {}).get(key) or {}
+
+    with HEALTH_LOCK:
+        st, waited = stats(), 0
         if (st.get("attempts") or 0) < cfg["min_attempts"]:
             health_probe(gw)
-            st = ((gw.health() or {}).get("recent") or {}).get(key) or {}
-        ratio = st.get("ok_ratio")
-        if not st.get("attempts") or ratio >= cfg["min_ok_ratio"]:
-            return st
-        if not wait:
-            sys.exit(f"ABORT: SAIA degraded ({ratio:.0%} of {st['attempts']} attempts ok in "
-                     f"the last {cfg['window_s'] // 60} min); rerun without --no-wait to wait")
-        if waited >= cfg["max_wait_s"]:
-            sys.exit(f"ABORT: SAIA degraded for {waited // 3600}h ({ratio:.0%} ok) — giving up")
-        log(f"SAIA degraded: {ratio:.0%} of {st['attempts']} attempts ok in the last "
-            f"{cfg['window_s'] // 60} min — waiting {cfg['poll_s'] // 60} min "
-            f"(waited {waited // 60} min so far)")
-        time.sleep(cfg["poll_s"])
-        waited += cfg["poll_s"]
-        health_probe(gw)
+            st = stats()
+        while True:
+            n, ratio = st.get("attempts") or 0, st.get("ok_ratio") or 0
+            enough = n >= cfg["min_attempts"]
+            if enough and ratio >= cfg["min_ok_ratio"]:
+                if waited:
+                    log(f"SAIA healthy again: {ratio:.0%} of {n} attempts ok in the last "
+                        f"{minutes} min — resuming (waited {waited // 60} min)")
+                return st
+            if not wait:
+                if enough:
+                    sys.exit(f"ABORT: SAIA degraded ({ratio:.0%} of {n} attempts ok in the "
+                             f"last {minutes} min); rerun without --no-wait to wait")
+                return st  # too little data to judge: ad-hoc runs proceed
+            if cfg["max_wait_s"] and waited >= cfg["max_wait_s"]:
+                sys.exit(f"ABORT: SAIA degraded for {waited // 3600}h ({ratio:.0%} ok) — giving up")
+            state = (f"degraded: {ratio:.0%} of {n} attempts ok" if enough else
+                     f"health unknown: {n} attempt(s), need {cfg['min_attempts']}")
+            log(f"SAIA {state} in the last {minutes} min — probing again in "
+                f"{cfg['poll_s'] // 60} min (waited {waited // 60} min so far)")
+            time.sleep(cfg["poll_s"])
+            waited += cfg["poll_s"]
+            health_probe(gw)
+            st = stats()
 
 
 def outage_check(gw, defaults):
@@ -1019,22 +1045,66 @@ def select_tasks(args, tasks):
     return [t for t in tasks.values() if not t.get("retired")]
 
 
-def done_cells():
-    """(task, combo, repeat) cells with a valid result in runs/. Archived
-    runs (runs/_smoke-*/...) are nested one level deeper and don't count."""
-    done = set()
+# Invalid-run flags that mean SAIA, not the agent or the bench, failed the run.
+SAIA_FLAGS = ("provider_error", "provider_outage", "stalled", "infra_slow_stream",
+              "budget_exhausted")
+
+
+def cell_tries():
+    """{(task, combo, repeat): {"valid", "saia", "other"}} from runs/: whether
+    a valid result exists, and how many invalid tries SAIA caused vs. other
+    causes (our harness or verifier). Archived runs (runs/_smoke-*/...) are
+    nested one level deeper and don't count."""
+    cells = {}
     for path in RUNS_DIR.glob("*/result.json"):
         try:
             r = read_json(path)
         except (OSError, ValueError):
             continue
         m = re.search(r"_r(\d+)$", r.get("run_id") or "")
-        if m and not r.get("invalid"):
-            done.add((r.get("task"), r.get("combo"), int(m.group(1))))
-    return done
+        if not m:
+            continue
+        c = cells.setdefault((r.get("task"), r.get("combo"), int(m.group(1))),
+                             {"valid": False, "saia": 0, "other": 0})
+        if not r.get("invalid"):
+            c["valid"] = True
+        elif any(f.startswith(SAIA_FLAGS) for f in r.get("flags") or []):
+            c["saia"] += 1
+        else:
+            c["other"] += 1
+    return cells
+
+
+def pending(plan, defaults):
+    """The cells of `plan` still to run: no valid result yet, fewer than
+    `saia_max_tries` SAIA-caused tries (every SAIA failure earns another
+    try, up to the cap) and fewer than 2 other invalid tries. Capped cells
+    are logged for a manual decision."""
+    cells, max_saia = cell_tries(), defaults.get("saia_max_tries", 5)
+    kept, done = [], 0
+    for item in plan:
+        c = cells.get((item[0]["name"], item[1], item[3]), {"valid": False, "saia": 0, "other": 0})
+        if c["valid"]:
+            done += 1
+        elif c["saia"] >= max_saia or c["other"] >= 2:
+            log(f"NEEDS ATTENTION {item[0]['name']}/{item[1]}_r{item[3]}: {c['saia']} "
+                f"SAIA-caused + {c['other']} other invalid tries — skipped")
+        else:
+            kept.append(item)
+    log(f"--skip-done: {done} cell(s) done, {len(plan) - done - len(kept)} capped, "
+        f"{len(kept)} to run")
+    return kept
 
 
 def cmd_run(args):
+    """One pass over the plan; with --until-done, passes repeat (re-reading
+    the tries in runs/) until a pass has nothing left to run."""
+    args.skip_done = args.skip_done or args.until_done
+    while run_pass(args) and args.until_done:
+        pass
+
+
+def run_pass(args):
     matrix = load_matrix()
     defaults = matrix["defaults"]
     tasks = load_tasks()
@@ -1046,10 +1116,7 @@ def cmd_run(args):
             for name, combo in combos.items()
             for rep in range(1, args.repeats + 1)]
     if args.skip_done:
-        done = done_cells()
-        kept = [p for p in plan if (p[0]["name"], p[1], p[3]) not in done]
-        log(f"--skip-done: {len(plan) - len(kept)} cell(s) already have a valid result")
-        plan = kept
+        plan = pending(plan, defaults)
     log(f"{len(plan)} run(s) planned: tasks={[t['name'] for t in selected_tasks]} "
         f"combos={list(combos)} repeats={args.repeats}")
     RUNS_DIR.mkdir(exist_ok=True)
@@ -1123,7 +1190,7 @@ def cmd_run(args):
     # attempts, so transient SAIA outages don't permanently crater a run.
     retries = [(t, n, c, rep) for t, n, c, rep, res in outcomes
                if res and res.get("invalid") and "harness_error" not in res["flags"]]
-    if retries and not args.dry_run and not args.no_retry:
+    if retries and not args.dry_run and not args.no_retry and not args.until_done:
         max_retries = 3
         backoff = [600, 1800, 3600]  # 10min, 30min, 60min
         for attempt in range(1, max_retries + 1):
@@ -1152,6 +1219,7 @@ def cmd_run(args):
                 f"{' | '.join(labels)}")
     if not args.dry_run:
         cmd_report(args)
+    return any(res for *_, res in outcomes)
 
 
 def expected_models(result):
@@ -1465,6 +1533,127 @@ def cmd_report(args):
     report_path = RUNS_DIR.parent / "report.md"
     report_path.write_text("\n".join(lines))
     log(f"wrote {csv_path} and {report_path}")
+    outage_report(load_matrix()["defaults"])
+
+
+STREAM_FAILURES = ("no_first_byte", "stream_too_slow", "stream_idle_timeout",
+                   "stream_upstream_error")  # a 200 whose stream then broke
+
+
+def outage_report(defaults):
+    """outages.md + outages.csv for reporting SAIA outages to the provider:
+    hourly answer rate and merged outage windows from the gateway's request
+    log (the same attempt-level measure the health gate uses), every failed
+    attempt with its Kong request id, agent runs lost to SAIA and capped
+    cells. Not committed: it names key suffixes."""
+    try:
+        lines = GATEWAY_REQUESTS_LOG.read_text().splitlines()
+    except OSError:
+        return
+    threshold = (defaults.get("health_gate") or {}).get("min_ok_ratio", 0.7)
+    model = defaults.get("model")
+    hours = defaultdict(lambda: {"n": 0, "ok": 0, "errors": Counter(), "kong": []})
+    failed = []
+    for line in lines:
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        h, attempts = hours[r["ts"][:13]], r.get("attempts") or []
+
+        def fail(err, key, latency, kong):
+            failed.append((r["ts"], r.get("run_id"), key, err, latency, kong or ""))
+            h["n"] += 1
+            h["errors"][err] += 1
+            if kong and len(h["kong"]) < 3:
+                h["kong"].append(kong)
+
+        for a in attempts:
+            if a.get("status") in (401, 403):
+                continue  # revoked key: not a SAIA health signal
+            if a.get("status") == 200:
+                h["n"] += 1
+                h["ok"] += 1
+            else:
+                fail(str(a.get("status") or a.get("err")), a.get("key"),
+                     a.get("upstream_ms") or a.get("ttfb_ms"), a.get("kong"))
+        if r.get("cause") in STREAM_FAILURES:
+            last = attempts[-1] if attempts else {}
+            fail(r["cause"], last.get("key"), r.get("latency_ms"), last.get("kong"))
+
+    def fmt(errors):
+        return ", ".join(f"{k} {v}" for k, v in errors.most_common())
+
+    windows = []  # consecutive outage hours (< threshold, >= 5 attempts) merged
+    for hour in sorted(hours):
+        h = hours[hour]
+        if h["n"] < 5 or h["ok"] / h["n"] >= threshold:
+            continue
+        start = datetime.fromisoformat(hour + ":00:00")
+        w = windows[-1] if windows else None
+        if w and w["end"] == start:
+            w["end"] = start + timedelta(hours=1)
+        else:
+            w = {"start": start, "end": start + timedelta(hours=1), "n": 0, "ok": 0,
+                 "errors": Counter(), "kong": []}
+            windows.append(w)
+        w["n"] += h["n"]
+        w["ok"] += h["ok"]
+        w["errors"] += h["errors"]
+        w["kong"] = (w["kong"] + h["kong"])[:3]
+    lost = []
+    for path in sorted(RUNS_DIR.glob("*/result.json")):
+        try:
+            r = read_json(path)
+        except (OSError, ValueError):
+            continue
+        if r.get("invalid") and any(f.startswith(SAIA_FLAGS) for f in r.get("flags") or []):
+            lost.append(r)
+    capped = sorted(k for k, c in cell_tries().items()
+                    if not c["valid"] and c["saia"] >= defaults.get("saia_max_tries", 5))
+
+    out = ["# SAIA outages", "",
+           f"Source: the bench gateway's log of every upstream attempt to SAIA "
+           f"(`chat-ai.academiccloud.de/v1`, model `{model}`), times in UTC. Answer rate = "
+           "successful attempts / attempts; 401/403 from a revoked key are excluded, a "
+           "stream that breaks after its 200 counts as a failed attempt. Errors: "
+           "`TimeoutError` = no response headers within 45 s, `500` = HTTP 500, "
+           "`stream_too_slow` = < 1 KB/s after 2 min or > 15 min, `stream_idle_timeout` = "
+           "no data for 90 s. Outage = an hour below "
+           f"{threshold:.0%} with ≥ 5 attempts. Every failed attempt with its Kong request id: "
+           "`outages.csv`.", "",
+           "## Outage windows", "",
+           "| start (UTC) | end (UTC) | attempts | answer rate | errors | sample Kong request ids |",
+           "|---|---|---|---|---|---|"]
+    for w in windows:
+        out.append(f"| {w['start']:%Y-%m-%d %H:%M} | {w['end']:%Y-%m-%d %H:%M} | {w['n']} | "
+                   f"{w['ok'] / w['n']:.0%} | {fmt(w['errors'])} | {', '.join(w['kong'])} |")
+    good = sum(1 for h in hours.values() if h["n"] >= 5 and h["ok"] / h["n"] >= threshold)
+    measured = sum(1 for h in hours.values() if h["n"] >= 5)
+    out += ["", f"## Hourly answer rate ({good}/{measured} measured hours ≥ {threshold:.0%})", "",
+            "| hour (UTC) | attempts | answer rate | errors |", "|---|---|---|---|"]
+    for hour in sorted(hours):
+        h = hours[hour]
+        if h["n"]:
+            out.append(f"| {hour.replace('T', ' ')}:00 | {h['n']} | {h['ok'] / h['n']:.0%} | "
+                       f"{fmt(h['errors'])} |")
+    out += ["", f"## Agent runs lost to SAIA ({len(lost)})", "",
+            "| run | combo | task | flags | requests |", "|---|---|---|---|---|"]
+    for r in lost:
+        out.append(f"| {r['run_id']} | {r.get('combo')} | {r.get('task')} | "
+                   f"{', '.join(r.get('flags') or [])} | "
+                   f"{(r.get('gateway') or {}).get('requests')} |")
+    if capped:
+        out += ["", "## Cells given up after the SAIA retry cap", ""]
+        out += [f"- {t} / {c} / r{rep}" for t, c, rep in capped]
+    md, csv_path = RUNS_DIR.parent / "outages.md", RUNS_DIR.parent / "outages.csv"
+    md.write_text("\n".join(out) + "\n")
+    with open(csv_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["ts_utc", "run_id", "key", "error", "latency_ms", "kong_request_id"])
+        w.writerows(failed)
+    log(f"wrote {md} ({len(windows)} outage window(s)) and {csv_path} "
+        f"({len(failed)} failed attempts)")
 
 
 def agent_section(results, task_defs):
@@ -1647,6 +1836,9 @@ def main():
     run_parser.add_argument("--skip-done", action="store_true",
                             help="skip task/combo/repeat cells that already have a valid "
                                  "result in runs/ (resume a campaign)")
+    run_parser.add_argument("--until-done", action="store_true",
+                            help="with --skip-done: repeat passes until every cell is valid "
+                                 "or capped (SAIA-failed runs get up to saia_max_tries)")
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--no-wait", action="store_true",
                             help="abort instead of waiting when budget is low")

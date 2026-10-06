@@ -3,6 +3,7 @@
     python3 -m pytest tests/test_gateway.py -q
 """
 
+import calendar
 import gzip
 import http.client
 import json
@@ -393,6 +394,17 @@ class GatewayTest(unittest.TestCase):
         token = self.register()
         again = gw.Registry(self.tmp / "state")
         self.assertIn(token, again.by_token)
+
+
+class ResetWindows(unittest.TestCase):
+    def test_month_resets_on_the_first_not_after_30_days(self):
+        def ms(s):
+            return calendar.timegm(time.strptime(s, "%Y-%m-%d %H:%M")) * 1000
+        oct20 = ms("2026-10-20 12:00")
+        self.assertFalse(gw.reset_passed("month", oct20, ms("2026-10-31 23:00") / 1000))
+        self.assertTrue(gw.reset_passed("month", oct20, ms("2026-11-01 00:30") / 1000))
+        self.assertFalse(gw.reset_passed("day", oct20, oct20 / 1000 + 3600))
+        self.assertTrue(gw.reset_passed("day", oct20, oct20 / 1000 + 86400))
 
 
 if __name__ == "__main__":

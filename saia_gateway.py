@@ -125,6 +125,15 @@ def load_keys():
     return list(dict.fromkeys(keys))
 
 
+def reset_passed(bucket, stamp_ms, now):
+    """Whether a bucket exhausted at `stamp_ms` has refilled by `now`. The
+    month bucket is a calendar month (Kong fixed window, UTC): a key spent on
+    the 20th is usable again on the 1st, not 30 days later."""
+    if bucket == "month":
+        return time.gmtime(stamp_ms / 1000)[:2] != time.gmtime(now)[:2]
+    return now * 1000 - stamp_ms >= RESET_TTL_S[bucket] * 1000
+
+
 class KeyState:
     def __init__(self, key, index):
         self.key = key
@@ -146,7 +155,7 @@ class KeyState:
                 self.mark_exhausted(b)
             stamp = self.exhausted[b]
             if stamp:
-                if now * 1000 - stamp < RESET_TTL_S[b] * 1000:
+                if not reset_passed(b, stamp, now):
                     ok = False
                 else:
                     self.exhausted[b] = 0

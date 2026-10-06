@@ -38,17 +38,19 @@
     },
     "gateway_params_note": "forced on every request of every agent combo (user decisions 2026-10-05/06): effort forced for all: high (2026-10-05), then medium (2026-10-06: high reasoned through the full 32k output with no answer) (omp sent high, mcode medium, others nothing); one output limit for all, because high effort exhausted pi's/mcode's 16k limit in reasoning (stopReason length / EMPTY_RESPONSE). max_tokens is stripped so max_completion_tokens is the only limit. A combo's gateway_params overrides.",
     "health_gate": {
-      "window_s": 900,
-      "min_ok_ratio": 0.5,
-      "min_attempts": 6,
-      "poll_s": 600,
-      "max_wait_s": 21600
+      "window_s": 3600,
+      "min_ok_ratio": 0.7,
+      "min_attempts": 4,
+      "poll_s": 900,
+      "max_wait_s": 0
     },
     "outage_abort": {
       "window_s": 900,
-      "max_ok_ratio": 0.2,
+      "max_ok_ratio": 0.5,
       "min_attempts": 10
-    }
+    },
+    "saia_max_tries": 5,
+    "health_note": "user decisions 2026-10-06: runs start only while > 70% of SAIA attempts in the last hour succeeded (decided on >= 4 attempts, probing every 15 min while waiting, no time limit); in-flight runs are stopped below 50% over 15 min; a cell gets up to 5 SAIA-caused tries (fairness), then is flagged"
   },
   "models": [
     "deepseek-v4-flash-0731",
