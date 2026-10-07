@@ -59,7 +59,6 @@ DEFAULT_MODEL = "deepseek-v4-flash-0731"
 # --- constants mirrored from saia-gwdg-plugin.js
 MIN_INTERVAL_S = 2.1
 FLOORS = {"hour": 5, "day": 10, "month": 30}
-RESET_TTL_S = {"hour": 3600, "day": 86400, "month": 30 * 86400}
 BUCKETS = ("minute", "hour", "day", "month")
 HEADERS_TIMEOUT_S = 45          # the plugin exempts deepseek from its 20s early-try deadline
 MAX_CONNECT_TRIES = 3
@@ -126,12 +125,14 @@ def load_keys():
 
 
 def reset_passed(bucket, stamp_ms, now):
-    """Whether a bucket exhausted at `stamp_ms` has refilled by `now`. The
-    month bucket is a calendar month (Kong fixed window, UTC): a key spent on
-    the 20th is usable again on the 1st, not 30 days later."""
-    if bucket == "month":
-        return time.gmtime(stamp_ms / 1000)[:2] != time.gmtime(now)[:2]
-    return now * 1000 - stamp_ms >= RESET_TTL_S[bucket] * 1000
+    """Whether a bucket exhausted at `stamp_ms` may have refilled by `now`:
+    from the next UTC hour / day / month on (Kong windows). If SAIA still
+    says exhausted, the first response's headers re-mark the key for one
+    rejected request — far cheaper than a fixed 24 h / 30 d lock (2026-10-07:
+    every key locked ~17 h after SAIA had refilled them; SAIA also reset all
+    month counters mid-month)."""
+    n = {"hour": 4, "day": 3, "month": 2}[bucket]  # gmtime: year, mon, mday, hour
+    return time.gmtime(stamp_ms / 1000)[:n] != time.gmtime(now)[:n]
 
 
 class KeyState:

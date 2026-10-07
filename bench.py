@@ -116,6 +116,7 @@ def load_tasks():
 
 BUCKET_LIMITS = {"hour": 200, "day": 1000, "month": 3000}
 KEYS_FILE = Path.home() / ".local/share/opencode/saia-gwdg-keys.json"
+AUTH_FILE = Path.home() / ".local/share/opencode/auth.json"
 
 
 def _read_snapshot(path):
@@ -164,30 +165,32 @@ def read_budget():
 
 
 def keyring_size():
-    """Number of SAIA keys in rotation (auth.json key + extras). Reads only
-    the count, never the key material."""
-    try:
-        extras = read_json(KEYS_FILE).get("keys", [])
-        return 1 + sum(1 for k in extras if isinstance(k, str) and k)
-    except (OSError, ValueError, AttributeError):
-        return 1
+    """Number of distinct SAIA keys in rotation: auth.json key + extras,
+    de-duplicated like the gateway's load_keys() (the auth key is usually an
+    extra too — counting it twice added a phantom full key). Only the count
+    leaves this function."""
+    keys = set()
+    for path, pick in ((AUTH_FILE, lambda d: [d.get("saia-gwdg", {}).get("key")]),
+                       (KEYS_FILE, lambda d: d.get("keys", []))):
+        try:
+            keys.update(k for k in pick(read_json(path)) if isinstance(k, str) and k)
+        except (OSError, ValueError, AttributeError):
+            pass
+    return max(1, len(keys))
 
 
 def budget_view(snap):
     """Aggregate remaining counts across keys. Handles both the multi-key
     snapshot format ({keys: [{label, updatedAt, remaining}], ...}) and the
-    old single-key one. A bucket's last count holds until it may have reset,
-    then counts as full: 65 min for the hour (the plugin's freshBudget()),
-    24 h for the day (a 65-min rule would reopen the gate during a daily-
-    budget wait), the calendar month (UTC) for the month — SAIA's limits
-    are Kong fixed windows. Dead (401/403) keys count as empty, exhausted
-    buckets as empty until the gateway's reset_passed()."""
+    old single-key one. A bucket's last count holds until its window may
+    have reset (the next UTC hour / day / month, the gateway's
+    reset_passed()), then counts as full. Dead (401/403) keys count as
+    empty, exhausted buckets as empty until reset_passed()."""
     entries = snap.get("keys")
     if not isinstance(entries, list) or not entries:
         entries = [{"updatedAt": snap.get("updatedAt"),
                     "remaining": snap.get("remaining")}]
     view = {"hour": 0, "day": 0, "month": 0}
-    hold = {"hour": 65 * 60, "day": 86400}
     any_fresh = False
     dead = 0
     now = datetime.now(timezone.utc)
@@ -197,10 +200,14 @@ def budget_view(snap):
             continue
         try:
             updated = datetime.fromisoformat(entry["updatedAt"].replace("Z", "+00:00"))
-            age = (now - updated).total_seconds()
         except (KeyError, TypeError, ValueError, AttributeError):
-            updated, age = None, -1  # never-used keys have updatedAt: null
-        any_fresh = any_fresh or 0 <= age <= hold["hour"]
+            updated = None  # never-used keys have updatedAt: null
+
+        def held(bucket):
+            return updated is not None and updated <= now and not reset_passed(
+                bucket, updated.timestamp() * 1000, now.timestamp())
+
+        any_fresh = any_fresh or held("hour")
         remaining = entry.get("remaining") or {}
         exhausted = entry.get("exhausted") or {}
         for bucket in view:
@@ -208,9 +215,7 @@ def budget_view(snap):
             if stamp and not reset_passed(bucket, stamp, now.timestamp()):
                 continue
             value = remaining.get(bucket)
-            held = (updated is not None and (updated.year, updated.month) == (now.year, now.month)
-                    if bucket == "month" else 0 <= age <= hold[bucket])
-            view[bucket] += (value if held and isinstance(value, (int, float))
+            view[bucket] += (value if held(bucket) and isinstance(value, (int, float))
                              else BUCKET_LIMITS[bucket])
     # Keys in rotation but missing from the snapshot (never used yet, e.g.
     # freshly added extras) count as full.
@@ -1046,15 +1051,24 @@ def select_tasks(args, tasks):
 
 
 # Invalid-run flags that mean SAIA, not the agent or the bench, failed the run.
-SAIA_FLAGS = ("provider_error", "provider_outage", "stalled", "infra_slow_stream",
-              "budget_exhausted")
+SAIA_FLAGS = ("provider_error", "provider_outage", "stalled", "infra_slow_stream")
+
+
+def saia_failed(result):
+    """Invalid because of SAIA. A run our own gateway refused for budget
+    (budget_exhausted — keys locked locally) is not SAIA's fault, even if
+    the refusals also tripped provider_error."""
+    flags = result.get("flags") or []
+    return (bool(result.get("invalid")) and not any(f.startswith("budget_exhausted") for f in flags)
+            and any(f.startswith(SAIA_FLAGS) for f in flags))
 
 
 def cell_tries():
     """{(task, combo, repeat): {"valid", "saia", "other"}} from runs/: whether
     a valid result exists, and how many invalid tries SAIA caused vs. other
-    causes (our harness or verifier). Archived runs (runs/_smoke-*/...) are
-    nested one level deeper and don't count."""
+    causes (our harness or verifier). Runs our gateway refused for budget
+    don't count as a try. Archived runs (runs/_smoke-*/...) are nested one
+    level deeper and don't count."""
     cells = {}
     for path in RUNS_DIR.glob("*/result.json"):
         try:
@@ -1068,9 +1082,9 @@ def cell_tries():
                              {"valid": False, "saia": 0, "other": 0})
         if not r.get("invalid"):
             c["valid"] = True
-        elif any(f.startswith(SAIA_FLAGS) for f in r.get("flags") or []):
+        elif saia_failed(r):
             c["saia"] += 1
-        else:
+        elif not any(f.startswith("budget_exhausted") for f in r.get("flags") or []):
             c["other"] += 1
     return cells
 
@@ -1607,7 +1621,7 @@ def outage_report(defaults):
             r = read_json(path)
         except (OSError, ValueError):
             continue
-        if r.get("invalid") and any(f.startswith(SAIA_FLAGS) for f in r.get("flags") or []):
+        if saia_failed(r):
             lost.append(r)
     capped = sorted(k for k, c in cell_tries().items()
                     if not c["valid"] and c["saia"] >= defaults.get("saia_max_tries", 5))

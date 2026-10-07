@@ -77,14 +77,17 @@ class EvaluateHardening(unittest.TestCase):
 class BudgetMerge(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.saved = (bench.BUDGET_FILE, bench.GATEWAY_BUDGET_FILE, bench.KEYS_FILE)
+        self.saved = (bench.BUDGET_FILE, bench.GATEWAY_BUDGET_FILE, bench.KEYS_FILE,
+                      bench.AUTH_FILE)
         bench.BUDGET_FILE = self.tmp / "plugin.json"
         bench.GATEWAY_BUDGET_FILE = self.tmp / "gateway.json"
         bench.KEYS_FILE = self.tmp / "keys.json"
+        bench.AUTH_FILE = self.tmp / "auth.json"
+        bench.AUTH_FILE.write_text(json.dumps({"saia-gwdg": {"key": "z"}}))
         bench.KEYS_FILE.write_text(json.dumps({"keys": ["a", "b"]}))  # 3 keys in rotation
 
     def tearDown(self):
-        bench.BUDGET_FILE, bench.GATEWAY_BUDGET_FILE, bench.KEYS_FILE = self.saved
+        bench.BUDGET_FILE, bench.GATEWAY_BUDGET_FILE, bench.KEYS_FILE, bench.AUTH_FILE = self.saved
         shutil.rmtree(self.tmp)
 
     def test_freshest_entry_wins_and_dead_keys_count_zero(self):
@@ -124,26 +127,30 @@ class BudgetMerge(unittest.TestCase):
         view = bench.budget_view(bench.read_budget())
         self.assertEqual((view["key_count"], view["month"]), (2, 3000))
 
-    def test_gate_waits_for_day_and_month(self):
+    def test_auth_key_listed_as_extra_counts_once(self):
+        bench.KEYS_FILE.write_text(json.dumps({"keys": ["z", "a"]}))  # z is the auth key
+        self.assertEqual(bench.keyring_size(), 2)
+
+    def test_counts_hold_until_their_utc_window_resets(self):
         now = datetime.now(timezone.utc)
-        old = now - timedelta(hours=3)
         bench.KEYS_FILE.write_text(json.dumps({"keys": []}))
 
-        def snap(day, month, updated=old):
+        def view(updated):
             bench.GATEWAY_BUDGET_FILE.write_text(json.dumps({"updatedAt": iso(updated), "keys": [
                 {"label": "k1", "updatedAt": iso(updated),
-                 "remaining": {"hour": 5, "day": day, "month": month}}]}))
+                 "remaining": {"hour": 5, "day": 50, "month": 100}}]}))
+            v = bench.budget_view(bench.read_budget())
+            return v["hour"], v["day"], v["month"]
 
-        snap(50, 100)  # 3 h old: the hour counts as refilled, the day holds 24 h,
-        view = bench.budget_view(bench.read_budget())  # the month its calendar month
-        same_month = (old.year, old.month) == (now.year, now.month)
-        self.assertEqual((view["hour"], view["day"], view["month"]),
-                         (200, 50, 100 if same_month else 3000))
-        snap(500, 100, updated=now - timedelta(days=40))  # last month's count: refilled
-        self.assertEqual(bench.budget_view(bench.read_budget())["month"], 3000)
+        self.assertEqual(view(now), (5, 50, 100))
+        self.assertEqual(view(now - timedelta(days=40)), (200, 1000, 3000))
+        old = now - timedelta(hours=3)  # another hour; same day/month unless it crossed one
+        self.assertEqual(view(old), (200, 50 if old.date() == now.date() else 1000,
+                                     100 if old.month == now.month else 3000))
 
-        class Waited(Exception):
-            pass
+    def test_gate_waits_for_day_and_month(self):
+        now = datetime.now(timezone.utc)
+        bench.KEYS_FILE.write_text(json.dumps({"keys": []}))
 
         def sleep(_):
             raise Waited
@@ -151,13 +158,19 @@ class BudgetMerge(unittest.TestCase):
         saved, bench.time.sleep = bench.time.sleep, sleep
         try:
             for day, month in ((50, 2000), (500, 100)):  # empty day, then empty month
-                snap(day, month, updated=now - timedelta(minutes=70))
+                bench.GATEWAY_BUDGET_FILE.write_text(json.dumps({"updatedAt": iso(now), "keys": [
+                    {"label": "k1", "updatedAt": iso(now),
+                     "remaining": {"hour": 150, "day": day, "month": month}}]}))
                 with self.assertRaises(Waited):  # waits for the reset, never aborts
                     bench.budget_gate(25, wait=True, run_floor=200)
                 with self.assertRaises(SystemExit):  # unless told not to wait
                     bench.budget_gate(25, wait=False, run_floor=200)
         finally:
             bench.time.sleep = saved
+
+
+class Waited(Exception):
+    pass
 
 
 class CellTries(unittest.TestCase):
@@ -182,6 +195,7 @@ class CellTries(unittest.TestCase):
             self.result(f"b{i}", 2, ["provider_error"])
         self.result("c", 3, ["provider_outage_p1"])
         self.result("d", 3, ["harness_error"])
+        self.result("f", 3, ["budget_exhausted", "provider_error"])  # our gateway refused: free
         self.result("_archive/e", 4, invalid=False)  # nested: doesn't count
         plan = [({"name": "t"}, "c", {}, rep) for rep in (1, 2, 3, 4)]
         self.assertEqual([item[3] for item in bench.pending(plan, {"saia_max_tries": 5})], [3, 4])

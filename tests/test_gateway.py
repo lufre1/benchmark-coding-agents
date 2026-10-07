@@ -397,14 +397,16 @@ class GatewayTest(unittest.TestCase):
 
 
 class ResetWindows(unittest.TestCase):
-    def test_month_resets_on_the_first_not_after_30_days(self):
+    def test_buckets_reset_at_the_next_utc_window(self):
         def ms(s):
             return calendar.timegm(time.strptime(s, "%Y-%m-%d %H:%M")) * 1000
         oct20 = ms("2026-10-20 12:00")
         self.assertFalse(gw.reset_passed("month", oct20, ms("2026-10-31 23:00") / 1000))
         self.assertTrue(gw.reset_passed("month", oct20, ms("2026-11-01 00:30") / 1000))
         self.assertFalse(gw.reset_passed("day", oct20, oct20 / 1000 + 3600))
-        self.assertTrue(gw.reset_passed("day", oct20, oct20 / 1000 + 86400))
+        self.assertTrue(gw.reset_passed("day", ms("2026-10-06 23:50"), ms("2026-10-07 00:10") / 1000))
+        self.assertFalse(gw.reset_passed("hour", oct20, ms("2026-10-20 12:59") / 1000))
+        self.assertTrue(gw.reset_passed("hour", oct20, ms("2026-10-20 13:00") / 1000))
 
 
 if __name__ == "__main__":
